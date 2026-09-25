@@ -3,4 +3,4 @@ services:
     name: nomenclador-ies-demo
     env: python
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn app:app
+    startCommand: python -m gunicorn app:app
