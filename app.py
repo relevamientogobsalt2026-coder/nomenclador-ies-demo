@@ -1,4 +1,5 @@
 import os
+import uuid
 from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, abort
 from supabase import create_client, Client
 
@@ -9,6 +10,29 @@ app.secret_key = "secret_key_ies_6039"
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "")
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY) if SUPABASE_URL else None
+
+# Bucket de Supabase Storage donde se guardan los documentos de los postulantes.
+# Tiene que existir y estar configurado como público (ver instrucciones).
+BUCKET_DOCUMENTOS = "documentos-postulantes"
+
+def subir_archivo(file_storage, subcarpeta):
+    """Sube un archivo adjunto del formulario a Supabase Storage y devuelve su URL pública.
+    Devuelve None si el campo vino vacío (el postulante no adjuntó ese archivo)."""
+    if not file_storage or file_storage.filename == '':
+        return None
+    try:
+        ext = os.path.splitext(file_storage.filename)[1]
+        nombre_archivo = f"{subcarpeta}/{uuid.uuid4().hex}{ext}"
+        contenido = file_storage.read()
+        supabase.storage.from_(BUCKET_DOCUMENTOS).upload(
+            nombre_archivo,
+            contenido,
+            {"content-type": file_storage.mimetype or "application/octet-stream"}
+        )
+        return supabase.storage.from_(BUCKET_DOCUMENTOS).get_public_url(nombre_archivo)
+    except Exception as e:
+        print(f"Error al subir archivo a Storage: {e}")
+        return None
 
 def init_db():
     """Ejecuta las consultas SQL de inicialización y actualización de tablas en Supabase"""
@@ -88,6 +112,13 @@ def postular():
     experiencia = request.form.get('experiencia')
     capacitacion = request.form.get('capacitacion')
 
+    # Subir documentación adjunta a Supabase Storage
+    dni_lado_a_url = subir_archivo(request.files.get('dni_a'), 'dni')
+    dni_lado_b_url = subir_archivo(request.files.get('dni_b'), 'dni')
+    titulo_1_lado_a_url = subir_archivo(request.files.get('titulo_a'), 'titulos')
+    titulo_1_lado_b_url = subir_archivo(request.files.get('titulo_b'), 'titulos')
+    cv_nominal_pdf_url = subir_archivo(request.files.get('cv_pdf'), 'cv')
+
     post_data = {
         "nombre_apellido": nombre,
         "dni": dni,
@@ -99,7 +130,12 @@ def postular():
         "titulo_base_2": titulo_2,
         "anio_egreso_2": int(egreso_2) if egreso_2 else None,
         "experiencia_nivel": experiencia,
-        "capacitaciones": capacitacion
+        "capacitaciones": capacitacion,
+        "dni_lado_a_url": dni_lado_a_url,
+        "dni_lado_b_url": dni_lado_b_url,
+        "titulo_1_lado_a_url": titulo_1_lado_a_url,
+        "titulo_1_lado_b_url": titulo_1_lado_b_url,
+        "cv_nominal_pdf_url": cv_nominal_pdf_url
     }
     
     inserted = supabase.table('postulaciones_docentes').insert(post_data).execute()
