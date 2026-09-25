@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Panel de Administración - Nomenclador IES</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen p-6">
+    <div class="max-w-6xl mx-auto">
+        <div class="flex justify-between items-center mb-6">
+            <h1 class="text-2xl font-bold">Gestión de Nomenclador y Relevamiento</h1>
+            <div class="space-x-2">
+                <a href="/admin/institutos" class="bg-amber-600 hover:bg-amber-700 text-white px-3 py-1.5 rounded text-xs font-semibold">📋 Ver Planilla de IES y Carreras</a>
+                <a href="/admin/seguimiento" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded text-xs font-semibold">📊 Ver Seguimiento de Postulaciones</a>
+                <a href="/" class="bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded text-xs">Ver Sitio Público</a>
+            </div>
+        </div>
+
+        <!-- Cargar Nueva Materia -->
+        <div class="bg-slate-800 p-6 rounded-lg mb-8 border border-slate-700">
+            <h2 class="text-lg font-bold mb-4 text-emerald-400">Cargar Nueva Materia al Nomenclador</h2>
+            <form action="/admin/nueva-materia" method="POST" class="grid grid-cols-1 md:grid-cols-3 gap-4 text-slate-800 text-xs">
+                <input type="text" name="resolucion" placeholder="Resolución (Ej: Res. 013/23)" required class="p-2 rounded">
+                <input type="text" name="carrera" placeholder="Carrera" required class="p-2 rounded">
+                <input type="number" name="anio" placeholder="Año (1, 2, 3)" required class="p-2 rounded">
+                <input type="text" name="codigo" placeholder="Código (Ej: 1.04)" required class="p-2 rounded">
+                <input type="text" name="nombre_unidad_curricular" placeholder="Nombre Materia" required class="p-2 rounded">
+                <select name="regimen" class="p-2 rounded">
+                    <option value="1er C.">1er Cuatrimestre</option>
+                    <option value="2do C.">2do Cuatrimestre</option>
+                    <option value="Anual">Anual</option>
+                </select>
+                <select name="formato" class="p-2 rounded">
+                    <option value="Materia">Materia</option>
+                    <option value="Taller">Taller</option>
+                    <option value="Laboratorio">Laboratorio</option>
+                    <option value="Práctica">Práctica Profesionalizante</option>
+                </select>
+                <input type="text" name="titulos" placeholder="Títulos Habilitantes (separados por coma)" required class="p-2 rounded md:col-span-2">
+                
+                <button type="submit" class="bg-emerald-600 text-white font-bold py-2 rounded md:col-span-3">Guardar en Nomenclador</button>
+            </form>
+        </div>
+    </div>
+</body>
+</html>

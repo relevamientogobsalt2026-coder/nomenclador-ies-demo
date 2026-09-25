@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Detalle del Postulante</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 30px; background-color: #f4f7f6; color: #333; }
+        .card { background: white; padding: 25px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); max-width: 600px; margin: auto; }
+        h1 { color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px; }
+        .info-group { margin-bottom: 15px; }
+        .label { font-weight: bold; color: #7f8c8d; }
+        .btn-container { margin-top: 25px; display: flex; gap: 10px; }
+        .btn { display: inline-block; padding: 10px 20px; border-radius: 5px; text-decoration: none; font-weight: bold; color: white; text-align: center; }
+        .btn-primary { background-color: #3498db; }
+        .btn-secondary { background-color: #2ecc71; }
+        ul { padding-left: 20px; }
+    </style>
+</head>
+<body>
+
+    <div class="card">
+        <h1>Legajo de Postulante - {{ docente.nombre_apellido }}</h1>
+        
+        <!-- Ficha Completa -->
+        <div class="info-group">
+            <p><span class="label">Identificación / ID:</span> {{ docente.id }}</p>
+            <p><span class="label">Correo Electrónico:</span> {{ docente.email }}</p>
+            <p><span class="label">Teléfono:</span> {{ docente.telefono }}</p>
+        </div>
+
+        <!-- Materias Habilitadas -->
+        <div class="info-group">
+            <h3>Materias Habilitadas</h3>
+            <ul>
+                {% for materia in docente.materias_habilitadas %}
+                    <li>{{ materia.nombre }}</li>
+                {% empty %}
+                    <li>No hay materias registradas para este postulante.</li>
+                {% endfor %}
+            </ul>
+        </div>
+
+        <!-- Botones de Acción para Documentación -->
+        <div class="btn-container">
+            <!-- Reemplaza los 'href' con tus rutas reales de Django/Framework -->
+            <a href="{% url 'ver_documento_grande' docente.id %}" class="btn btn-primary">Ver Documento Grande</a>
+            <a href="{% url 'descargar_pdf' docente.id %}" class="btn btn-secondary">Descargar PDF</a>
+        </div>
+    </div>
+
+</body>
+</html>

@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Materias Habilitadas - Relevamiento Docente</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-100 min-h-screen text-slate-800 p-6">
+    <div class="max-w-5xl mx-auto bg-white rounded-xl shadow-lg p-8 border border-slate-200">
+        <h2 class="text-2xl font-bold text-slate-900 mb-1">Resultado del Análisis de Nomenclatura</h2>
+        <p class="text-sm text-slate-600 mb-6">Se evaluó su perfil contra el nomenclador oficial de la provincia de Salta.</p>
+
+        <div class="bg-emerald-50 border border-emerald-200 text-emerald-900 p-4 rounded-lg mb-6">
+            <p class="font-bold">Docente: {{ docente.nombre_apellido }} (DNI: {{ docente.dni }})</p>
+            <p class="text-xs">Títulos analizados: {{ docente.titulo_base_1 }} {% if docente.titulo_base_2 %}| {{ docente.titulo_base_2 }}{% endif %}</p>
+        </div>
+
+        <h3 class="text-lg font-bold text-slate-800 mb-4">Unidades Curriculares Habilitadas para Postulación</h3>
+
+        {% if materias %}
+        <div class="overflow-x-auto mb-6">
+            <table class="w-full text-left border-collapse text-sm">
+                <thead>
+                    <tr class="bg-slate-100 border-b">
+                        <th class="p-3">Estado</th>
+                        <th class="p-3">Código</th>
+                        <th class="p-3">Unidad Curricular</th>
+                        <th class="p-3">Carrera / Resolución</th>
+                        <th class="p-3">Régimen</th>
+                        <th class="p-3">Instituto (IES)</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y">
+                    {% for m in materias %}
+                    <tr class="hover:bg-slate-50">
+                        <td class="p-3 text-center">
+                            <span class="inline-block w-4 h-4 bg-emerald-500 rounded-full" title="Habilitado según Nomenclador"></span>
+                        </td>
+                        <td class="p-3 font-bold text-slate-700">{{ m.codigo }}</td>
+                        <td class="p-3 font-semibold text-indigo-900">{{ m.nombre_unidad_curricular }}</td>
+                        <td class="p-3 text-xs">{{ m.carrera }}<br><span class="text-slate-400">{{ m.resolucion }}</span></td>
+                        <td class="p-3 text-xs">{{ m.regimen }} ({{ m.formato }})</td>
+                        <td class="p-3 text-xs font-medium">
+                            {{ m.institutos.nombre }}<br>
+                            <span class="text-slate-500">📍 {{ m.institutos.localidad }} | ✉️ {{ m.institutos.email }}</span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="text-red-500 my-4 font-semibold">No se encontraron materias compatibles para los títulos ingresados.</p>
+        {% endif %}
+
+        <div class="flex gap-4">
+            <a href="mailto:{{ materias[0].institutos.email if materias else 'ies6039aguaray@gmail.com' }}" class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded text-sm font-semibold">
+                ✉️ Enviar Postulación al Correo Institucional
+            </a>
+            <a href="/" class="bg-slate-200 text-slate-700 px-6 py-2 rounded text-sm font-semibold">Volver al Inicio</a>
+        </div>
+    </div>
+</body>
+</html>

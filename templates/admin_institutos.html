@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Gestión de Institutos y Carreras - Admin</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-100 text-slate-800 min-h-screen">
+    <header class="bg-indigo-900 text-white p-4 shadow flex justify-between items-center">
+        <h1 class="text-lg font-bold">Gestión de Oferta Académica e Institutos (Salta 2026)</h1>
+        <div class="space-x-2">
+            <a href="/admin" class="bg-indigo-700 hover:bg-indigo-600 px-3 py-1 rounded text-xs">Nomenclador de Materias</a>
+            <a href="/admin/seguimiento" class="bg-emerald-600 hover:bg-emerald-700 px-3 py-1 rounded text-xs">Seguimiento Docente</a>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto my-6 p-6 bg-white rounded-xl shadow border">
+        <h2 class="text-xl font-bold mb-4 text-indigo-900">Listado de Carreras y Resoluciones Viculares</h2>
+        
+        <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse text-xs">
+                <thead>
+                    <tr class="bg-indigo-50 text-indigo-900 border-b">
+                        <th class="p-2">Instituto / Nº</th>
+                        <th class="p-2">Carrera</th>
+                        <th class="p-2">Resolución (Vínculo)</th>
+                        <th class="p-2">Localidad</th>
+                        <th class="p-2">Vigente</th>
+                        <th class="p-2 text-center">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y">
+                    {% for row in institutos %}
+                    <tr class="hover:bg-slate-50">
+                        <form action="/admin/institutos/editar/{{ row.id }}" method="POST">
+                            <td class="p-2 font-semibold">
+                                <input type="text" name="nombre_instituto" value="{{ row.nombre_instituto }}" class="border p-1 rounded w-full"><br>
+                                <span class="text-slate-500">Nº: {{ row.numero_instituto }}</span>
+                            </td>
+                            <td class="p-2">
+                                <textarea name="carrera" rows="2" class="border p-1 rounded w-full">{{ row.carrera }}</textarea>
+                            </td>
+                            <td class="p-2">
+                                <input type="text" name="resolucion_carrera" value="{{ row.resolucion_carrera }}" class="border p-1 rounded font-bold text-indigo-700">
+                            </td>
+                            <td class="p-2">
+                                <input type="text" name="localidad" value="{{ row.localidad }}" class="border p-1 rounded">
+                            </td>
+                            <td class="p-2">
+                                <select name="vigente" class="border p-1 rounded">
+                                    <option value="Sí" {% if row.vigente == 'Sí' %}selected{% endif %}>Sí</option>
+                                    <option value="No" {% if row.vigente == 'No' %}selected{% endif %}>No</option>
+                                </select>
+                            </td>
+                            <td class="p-2 text-center">
+                                <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded font-semibold">Actualizar</button>
+                            </td>
+                        </form>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </main>
+</body>
+</html>
