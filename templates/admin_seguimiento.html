@@ -88,6 +88,7 @@
 
                         <!-- Columna unificada para el botón de Borrar -->
                         <td class="p-3 text-center whitespace-nowrap">
+                            <a href="{{ url_for('detalle_postulante', docente_id=p.id) }}" class="inline-block bg-emerald-600 hover:bg-emerald-700 text-white px-2 py-1 rounded shadow-sm mr-1">Ver</a>
                             <form action="/admin/postulacion/borrar/{{ p.id }}" method="POST" class="inline" onsubmit="return confirm('¿Está seguro de eliminar esta inscripción?');">
                                 <button type="submit" class="bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded shadow-sm">Borrar</button>
                             </form>
@@ -120,4 +121,3 @@
     </script>
 </body>
 </html>
-

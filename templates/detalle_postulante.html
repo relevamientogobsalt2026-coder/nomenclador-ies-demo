@@ -34,18 +34,31 @@
             <h3>Materias Habilitadas</h3>
             <ul>
                 {% for materia in docente.materias_habilitadas %}
-                    <li>{{ materia.nombre }}</li>
-                {% empty %}
+                    <li>{{ materia.nombre_unidad_curricular if materia.nombre_unidad_curricular else materia.nombre }}</li>
+                {% else %}
                     <li>No hay materias registradas para este postulante.</li>
                 {% endfor %}
             </ul>
         </div>
 
-        <!-- Botones de Acción para Documentación -->
+        <!-- Documentos Adjuntos -->
+        <div class="info-group">
+            <h3>Documentos Adjuntos</h3>
+            <div class="btn-container" style="flex-wrap: wrap;">
+                {% if docente.dni_lado_a_url %}<a href="{{ docente.dni_lado_a_url }}" target="_blank" class="btn btn-primary">DNI Frente</a>{% endif %}
+                {% if docente.dni_lado_b_url %}<a href="{{ docente.dni_lado_b_url }}" target="_blank" class="btn btn-primary">DNI Dorso</a>{% endif %}
+                {% if docente.titulo_1_lado_a_url %}<a href="{{ docente.titulo_1_lado_a_url }}" target="_blank" class="btn btn-primary">Título Frente</a>{% endif %}
+                {% if docente.titulo_1_lado_b_url %}<a href="{{ docente.titulo_1_lado_b_url }}" target="_blank" class="btn btn-primary">Título Dorso</a>{% endif %}
+                {% if docente.cv_nominal_pdf_url %}<a href="{{ docente.cv_nominal_pdf_url }}" target="_blank" class="btn btn-secondary">Descargar CV (PDF)</a>{% endif %}
+                {% if docente.certificados_pdf_url %}<a href="{{ docente.certificados_pdf_url }}" target="_blank" class="btn btn-secondary">Descargar Certificados (PDF)</a>{% endif %}
+                {% if not docente.dni_lado_a_url and not docente.dni_lado_b_url and not docente.titulo_1_lado_a_url and not docente.titulo_1_lado_b_url and not docente.cv_nominal_pdf_url and not docente.certificados_pdf_url %}
+                    <span style="color:#999; font-style: italic;">Sin archivos adjuntos</span>
+                {% endif %}
+            </div>
+        </div>
+
         <div class="btn-container">
-            <!-- Reemplaza los 'href' con tus rutas reales de Django/Framework -->
-            <a href="{% url 'ver_documento_grande' docente.id %}" class="btn btn-primary">Ver Documento Grande</a>
-            <a href="{% url 'descargar_pdf' docente.id %}" class="btn btn-secondary">Descargar PDF</a>
+            <a href="{{ url_for('admin_seguimiento') }}" class="btn" style="background-color:#7f8c8d;">← Volver al listado</a>
         </div>
     </div>
 
