@@ -1,5 +1,5 @@
 import os
-from flask import Flask, render_template, request, jsonify, redirect, url_for, flash
+from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, abort
 from supabase import create_client, Client
 
 app = Flask(__name__)
@@ -169,7 +169,7 @@ def admin_institutos():
     datos = supabase.table('institutos_carreras').select('*').execute().data
     return render_template('admin_institutos.html', institutos=datos)
 
-@app.route('/admin/institutos/editar/<int:id>', methods=['POST'])
+@app.route('/admin/institutos/editar/', methods=['POST'])
 def editar_instituto(id):
     try:
         supabase.table('institutos_carreras').update({
@@ -191,7 +191,7 @@ def admin_seguimiento():
     postulaciones = supabase.table('postulaciones_docentes').select('*').execute().data
     return render_template('admin_seguimiento.html', postulaciones=postulaciones)
 
-@app.route('/admin/postulacion/editar/<int:id>', methods=['POST'])
+@app.route('/admin/postulacion/editar/', methods=['POST'])
 def editar_postulacion(id):
     try:
         supabase.table('postulaciones_docentes').update({
@@ -202,13 +202,33 @@ def editar_postulacion(id):
     except Exception as e:
         return f"Error al actualizar postulación: {e}", 500
 
-@app.route('/admin/postulacion/borrar/<int:id>', methods=['POST'])
+@app.route('/admin/postulacion/borrar/', methods=['POST'])
 def borrar_postulacion(id):
     try:
         supabase.table('postulaciones_docentes').delete().eq('id', id).execute()
         return redirect(url_for('admin_seguimiento'))
     except Exception as e:
         return f"Error al borrar postulación: {e}", 500
+
+# --- NUEVA RUTA: DETALLE INDIVIDUAL DEL POSTULANTE ---
+@app.route('/postulante/')
+def detalle_postulante(docente_id):
+    if not supabase:
+        return "Supabase no configurado.", 500
+    
+    # Busca los datos principales del postulante
+    response = supabase.table('postulaciones_docentes').select('*').eq('id', docente_id).execute()
+    
+    if not response.data:
+        abort(404)
+        
+    docente = response.data[0]
+
+    # Opcional: Buscar también las materias habilitadas en el historial para mostrarlas en la ficha
+    historial = supabase.table('historial_relevamiento').select('materia_id, materias_nomenclador(nombre_unidad_curricular)').eq('postulante_id', docente_id).execute()
+    docente['materias_habilitadas'] = [item['materias_nomenclador'] for item in historial.data if item.get('materias_nomenclador')]
+    
+    return render_template('detalle_postulante.html', docente=docente)
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=10000)
