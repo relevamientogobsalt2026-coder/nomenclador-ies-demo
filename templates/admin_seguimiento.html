@@ -6,11 +6,15 @@
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-slate-100 text-slate-800 min-h-screen">
-    <header class="bg-indigo-900 text-white p-4 shadow flex justify-between items-center">
-        <h1 class="text-lg font-bold">Panel de Seguimiento e Inscripciones Docentes</h1>
-        <div class="space-x-3">
-            <a href="/admin" class="bg-indigo-700 hover:bg-indigo-600 px-3 py-1.5 rounded text-xs font-semibold">Nomenclador y Materias</a>
-            <a href="/" class="bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded text-xs">Ir al Sitio</a>
+    <header class="bg-indigo-900 text-white p-4 shadow">
+        <div class="max-w-7xl mx-auto flex flex-col md:flex-row md:justify-between md:items-center gap-3">
+            <h1 class="text-lg font-bold">Panel de Seguimiento e Inscripciones Docentes</h1>
+            <div class="flex flex-wrap gap-2">
+                <a href="/admin" class="bg-indigo-700 hover:bg-indigo-600 px-3 py-1.5 rounded text-xs font-semibold whitespace-nowrap">Nomenclador y Materias</a>
+                <a href="/admin/instituciones" class="bg-purple-600 hover:bg-purple-700 px-3 py-1.5 rounded text-xs font-semibold whitespace-nowrap">🏫 Institutos y Emails</a>
+                <a href="/admin/institutos" class="bg-amber-600 hover:bg-amber-700 px-3 py-1.5 rounded text-xs font-semibold whitespace-nowrap">📋 Planilla IES y Carreras</a>
+                <a href="/" class="bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded text-xs whitespace-nowrap">🌐 Ir al Sitio</a>
+            </div>
         </div>
     </header>
 
