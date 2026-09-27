@@ -1,8 +1,15 @@
 import os
 import uuid
 import urllib.parse
-from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, abort
+from io import BytesIO
+from datetime import datetime
+from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, abort, send_file
 from supabase import create_client, Client
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.units import mm
+from reportlab.lib import colors
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image as RLImage, Table, TableStyle, HRFlowable
 
 app = Flask(__name__)
 app.secret_key = "secret_key_ies_6039"
@@ -34,6 +41,117 @@ def subir_archivo(file_storage, subcarpeta):
     except Exception as e:
         print(f"Error al subir archivo a Storage: {e}")
         return None
+
+LOGO_PATH = os.path.join(os.path.dirname(__file__), 'static', 'logo_salta.png')
+
+def generar_comprobante_pdf(docente, materias_habilitadas):
+    """Genera el PDF de comprobante de inscripción del postulante, con el logo del
+    Ministerio de Educación y Cultura de Salta, y lo devuelve como BytesIO."""
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(
+        buffer, pagesize=A4,
+        topMargin=18 * mm, bottomMargin=18 * mm, leftMargin=20 * mm, rightMargin=20 * mm
+    )
+    styles = getSampleStyleSheet()
+
+    titulo_style = ParagraphStyle('TituloComprobante', parent=styles['Title'], fontSize=16,
+                                   textColor=colors.HexColor('#4c1d95'), spaceAfter=2)
+    subtitulo_style = ParagraphStyle('Subtitulo', parent=styles['Normal'], fontSize=9,
+                                      textColor=colors.HexColor('#64748b'), spaceAfter=12)
+    label_style = ParagraphStyle('Label', parent=styles['Normal'], fontSize=10,
+                                  textColor=colors.HexColor('#334155'))
+    h2_style = ParagraphStyle('H2Comp', parent=styles['Heading2'], fontSize=12,
+                               textColor=colors.HexColor('#4c1d95'))
+    pie_style = ParagraphStyle('Pie', parent=styles['Normal'], fontSize=8,
+                                textColor=colors.HexColor('#94a3b8'))
+
+    story = []
+
+    if os.path.exists(LOGO_PATH):
+        ancho_logo = 60 * mm
+        alto_logo = ancho_logo * (103 / 370)  # mantiene la proporción real del logo
+        story.append(RLImage(LOGO_PATH, width=ancho_logo, height=alto_logo))
+        story.append(Spacer(1, 10))
+
+    story.append(Paragraph("Comprobante de Inscripción Docente", titulo_style))
+    story.append(Paragraph(
+        "Ministerio de Educación y Cultura - Provincia de Salta | Nomenclador y Relevamiento Docente",
+        subtitulo_style
+    ))
+    story.append(HRFlowable(width="100%", color=colors.HexColor('#c7d2fe'), thickness=1))
+    story.append(Spacer(1, 14))
+
+    fecha = datetime.now().strftime('%d/%m/%Y %H:%M')
+    story.append(Paragraph(f"<b>Fecha de emisión:</b> {fecha}", label_style))
+    story.append(Spacer(1, 10))
+
+    localidades = docente.get('localidades_postulacion') or []
+    datos = [
+        ["Nombre y Apellido:", docente.get('nombre_apellido') or ''],
+        ["DNI:", docente.get('dni') or ''],
+        ["Teléfono:", docente.get('telefono') or ''],
+        ["Email:", docente.get('email') or ''],
+        ["Localidades postuladas:", ", ".join(localidades)],
+        ["Título 1:", f"{docente.get('titulo_base_1') or ''} ({docente.get('anio_egreso_1') or ''})"],
+    ]
+    if docente.get('titulo_base_2'):
+        datos.append(["Título 2:", f"{docente.get('titulo_base_2')} ({docente.get('anio_egreso_2') or ''})"])
+
+    tabla_datos = Table(datos, colWidths=[50 * mm, 110 * mm])
+    tabla_datos.setStyle(TableStyle([
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+        ('TEXTCOLOR', (0, 0), (0, -1), colors.HexColor('#4c1d95')),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+        ('TOPPADDING', (0, 0), (-1, -1), 2),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+    ]))
+    story.append(tabla_datos)
+    story.append(Spacer(1, 18))
+
+    story.append(Paragraph("Unidades Curriculares Habilitadas", h2_style))
+    story.append(Spacer(1, 6))
+
+    if materias_habilitadas:
+        filas = [["Código", "Unidad Curricular", "Carrera", "Instituto"]]
+        for m in materias_habilitadas:
+            inst = m.get('institutos') or {}
+            filas.append([
+                m.get('codigo') or '',
+                m.get('nombre_unidad_curricular') or '',
+                m.get('carrera') or '',
+                inst.get('nombre') or ''
+            ])
+        tabla_mat = Table(filas, colWidths=[18 * mm, 55 * mm, 47 * mm, 40 * mm])
+        tabla_mat.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#ede9fe')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.HexColor('#4c1d95')),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 8),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#cbd5e1')),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f8fafc')]),
+        ]))
+        story.append(tabla_mat)
+    else:
+        story.append(Paragraph(
+            "No se encontraron materias compatibles en el nomenclador para los títulos "
+            "ingresados al momento de la inscripción.",
+            label_style
+        ))
+
+    story.append(Spacer(1, 26))
+    story.append(HRFlowable(width="100%", color=colors.HexColor('#e2e8f0'), thickness=0.5))
+    story.append(Spacer(1, 6))
+    story.append(Paragraph(
+        "Este comprobante certifica que la postulación fue recibida por el sistema. "
+        "No implica la aprobación de la inscripción, la cual queda sujeta a revisión administrativa.",
+        pie_style
+    ))
+
+    doc.build(story)
+    buffer.seek(0)
+    return buffer
 
 def armar_mailto(docente, materias_habilitadas):
     """Arma un link mailto: con asunto y cuerpo pre-cargados con los datos del postulante
@@ -195,7 +313,8 @@ def postular():
     return render_template('resultado_postulacion.html', 
                            docente=post_data, 
                            materias=materias_habilitadas,
-                           mailto_link=armar_mailto(post_data, materias_habilitadas))
+                           mailto_link=armar_mailto(post_data, materias_habilitadas),
+                           postulante_id=postulante_id)
 
 # 3. SECCIÓN ADMINISTRADOR: Nomenclador y Estadísticas
 @app.route('/admin')
@@ -327,6 +446,26 @@ def borrar_postulacion(id):
         return redirect(url_for('admin_seguimiento'))
     except Exception as e:
         return f"Error al borrar postulación: {e}", 500
+
+# --- COMPROBANTE DE INSCRIPCIÓN (PDF DESCARGABLE) ---
+@app.route('/comprobante/<int:postulante_id>')
+def comprobante_pdf(postulante_id):
+    if not supabase:
+        return "Supabase no configurado.", 500
+
+    response = supabase.table('postulaciones_docentes').select('*').eq('id', postulante_id).execute()
+    if not response.data:
+        abort(404)
+    docente = response.data[0]
+
+    historial = supabase.table('historial_relevamiento') \
+        .select('materia_id, materias_nomenclador(*, institutos(*))') \
+        .eq('postulante_id', postulante_id).execute()
+    materias_habilitadas = [item['materias_nomenclador'] for item in historial.data if item.get('materias_nomenclador')]
+
+    buffer = generar_comprobante_pdf(docente, materias_habilitadas)
+    nombre_archivo = f"comprobante_inscripcion_{docente.get('dni') or postulante_id}.pdf"
+    return send_file(buffer, mimetype='application/pdf', as_attachment=True, download_name=nombre_archivo)
 
 # --- NUEVA RUTA: DETALLE INDIVIDUAL DEL POSTULANTE ---
 @app.route('/postulante/<int:docente_id>')
