@@ -1,5 +1,6 @@
 import os
 import uuid
+import urllib.parse
 from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, abort
 from supabase import create_client, Client
 
@@ -33,6 +34,39 @@ def subir_archivo(file_storage, subcarpeta):
     except Exception as e:
         print(f"Error al subir archivo a Storage: {e}")
         return None
+
+def armar_mailto(docente, materias_habilitadas):
+    """Arma un link mailto: con asunto y cuerpo pre-cargados con los datos del postulante
+    y las materias habilitadas, dirigido al email del instituto correspondiente."""
+    asunto = f"Postulación Docente - {docente.get('nombre_apellido')} (DNI: {docente.get('dni')})"
+
+    lineas = [
+        f"Nombre y Apellido: {docente.get('nombre_apellido')}",
+        f"DNI: {docente.get('dni')}",
+        f"Teléfono: {docente.get('telefono')}",
+        f"Email: {docente.get('email')}",
+        f"Título 1: {docente.get('titulo_base_1')} ({docente.get('anio_egreso_1')})",
+    ]
+    if docente.get('titulo_base_2'):
+        lineas.append(f"Título 2: {docente.get('titulo_base_2')} ({docente.get('anio_egreso_2')})")
+    lineas.append("")
+
+    if materias_habilitadas:
+        lineas.append("Unidades curriculares habilitadas según nomenclador:")
+        for m in materias_habilitadas:
+            lineas.append(f"- {m.get('codigo')} | {m.get('nombre_unidad_curricular')} ({m.get('carrera')})")
+        email_destino = materias_habilitadas[0].get('institutos', {}).get('email') or 'ies6039aguaray@gmail.com'
+    else:
+        lineas.append("No se encontraron materias compatibles en el nomenclador para los títulos ingresados.")
+        email_destino = 'ies6039aguaray@gmail.com'
+
+    cuerpo = "\n".join(lineas)
+
+    return (
+        f"mailto:{email_destino}"
+        f"?subject={urllib.parse.quote(asunto)}"
+        f"&body={urllib.parse.quote(cuerpo)}"
+    )
 
 def init_db():
     """Ejecuta las consultas SQL de inicialización y actualización de tablas en Supabase"""
@@ -160,7 +194,8 @@ def postular():
 
     return render_template('resultado_postulacion.html', 
                            docente=post_data, 
-                           materias=materias_habilitadas)
+                           materias=materias_habilitadas,
+                           mailto_link=armar_mailto(post_data, materias_habilitadas))
 
 # 3. SECCIÓN ADMINISTRADOR: Nomenclador y Estadísticas
 @app.route('/admin')
@@ -170,15 +205,15 @@ def admin():
     
     materias = supabase.table('materias_nomenclador').select('*, institutos(*)').execute().data
     postulaciones = supabase.table('postulaciones_docentes').select('*').execute().data
+    institutos = supabase.table('institutos').select('*').order('nombre').execute().data
     
-    return render_template('admin.html', materias=materias, postulaciones=postulaciones)
+    return render_template('admin.html', materias=materias, postulaciones=postulaciones, institutos=institutos)
 
 # 4. GUARDAR NUEVA MATERIA EN NOMENCLADOR (ADMIN)
 @app.route('/admin/nueva-materia', methods=['POST'])
 def nueva_materia():
     try:
-        inst = supabase.table('institutos').select('id').limit(1).execute()
-        inst_id = inst.data[0]['id'] if inst.data else 1
+        inst_id = request.form.get('instituto_id')
 
         data = {
             "resolucion": request.form.get('resolucion'),
@@ -189,13 +224,60 @@ def nueva_materia():
             "regimen": request.form.get('regimen'),
             "formato": request.form.get('formato'),
             "titulos_habilitantes": [t.strip() for t in request.form.get('titulos', '').split(',') if t.strip()],
-            "instituto_id": inst_id
+            "instituto_id": int(inst_id) if inst_id else None
         }
         supabase.table('materias_nomenclador').insert(data).execute()
         return redirect(url_for('admin'))
     except Exception as e:
         print(f"Error al insertar materia: {e}")
         return f"Ocurrió un error al guardar en la base de datos: {e}", 500
+
+# --- GESTIÓN DE INSTITUTOS (NOMBRE, EMAIL DE CONTACTO PARA POSTULACIONES) ---
+@app.route('/admin/instituciones')
+def admin_instituciones():
+    if not supabase:
+        return "Supabase no configurado."
+    institutos = supabase.table('institutos').select('*').order('nombre').execute().data
+    return render_template('admin_instituciones.html', institutos=institutos)
+
+@app.route('/admin/instituciones/nueva', methods=['POST'])
+def nueva_institucion():
+    try:
+        data = {
+            "numero_ies": request.form.get('numero_ies'),
+            "nombre": request.form.get('nombre'),
+            "localidad": request.form.get('localidad'),
+            "direccion": request.form.get('direccion'),
+            "email": request.form.get('email'),
+            "telefono": request.form.get('telefono')
+        }
+        supabase.table('institutos').insert(data).execute()
+        return redirect(url_for('admin_instituciones'))
+    except Exception as e:
+        return f"Error al crear el instituto: {e}", 500
+
+@app.route('/admin/instituciones/editar/<int:id>', methods=['POST'])
+def editar_institucion(id):
+    try:
+        supabase.table('institutos').update({
+            "numero_ies": request.form.get('numero_ies'),
+            "nombre": request.form.get('nombre'),
+            "localidad": request.form.get('localidad'),
+            "direccion": request.form.get('direccion'),
+            "email": request.form.get('email'),
+            "telefono": request.form.get('telefono')
+        }).eq('id', id).execute()
+        return redirect(url_for('admin_instituciones'))
+    except Exception as e:
+        return f"Error al actualizar el instituto: {e}", 500
+
+@app.route('/admin/instituciones/borrar/<int:id>', methods=['POST'])
+def borrar_institucion(id):
+    try:
+        supabase.table('institutos').delete().eq('id', id).execute()
+        return redirect(url_for('admin_instituciones'))
+    except Exception as e:
+        return f"Error al borrar el instituto: {e}", 500
 
 # --- GESTIÓN DE INSTITUTOS Y CARRERAS (ADMIN) ---
 @app.route('/admin/institutos')

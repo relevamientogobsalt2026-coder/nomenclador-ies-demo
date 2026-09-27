@@ -54,7 +54,7 @@
         {% endif %}
 
         <div class="flex gap-4">
-            <a href="mailto:{{ materias[0].institutos.email if materias else 'ies6039aguaray@gmail.com' }}" class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded text-sm font-semibold">
+            <a href="{{ mailto_link }}" class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded text-sm font-semibold">
                 ✉️ Enviar Postulación al Correo Institucional
             </a>
             <a href="/" class="bg-slate-200 text-slate-700 px-6 py-2 rounded text-sm font-semibold">Volver al Inicio</a>

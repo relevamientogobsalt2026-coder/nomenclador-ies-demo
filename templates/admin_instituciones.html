@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Institutos - Emails de Contacto</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-100 text-slate-800 min-h-screen">
+    <header class="bg-purple-900 text-white p-4 shadow flex justify-between items-center">
+        <h1 class="text-lg font-bold">Institutos y Emails de Contacto</h1>
+        <div class="space-x-3">
+            <a href="/admin" class="bg-purple-700 hover:bg-purple-600 px-3 py-1.5 rounded text-xs font-semibold">Nomenclador y Materias</a>
+            <a href="/" class="bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded text-xs">Ir al Sitio</a>
+        </div>
+    </header>
+
+    <main class="max-w-6xl mx-auto my-6 p-6 bg-white rounded-xl shadow border">
+
+        <!-- Alta de nuevo instituto -->
+        <div class="mb-8 border-b pb-6">
+            <h2 class="text-lg font-bold text-purple-900 mb-4">Registrar Nuevo Instituto</h2>
+            <form action="/admin/instituciones/nueva" method="POST" class="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+                <input type="text" name="numero_ies" placeholder="N° de IES (Ej: 6039)" required class="border p-2 rounded">
+                <input type="text" name="nombre" placeholder="Nombre del Instituto" required class="border p-2 rounded md:col-span-2">
+                <input type="text" name="localidad" placeholder="Localidad" required class="border p-2 rounded">
+                <input type="text" name="direccion" placeholder="Dirección" class="border p-2 rounded">
+                <input type="text" name="telefono" placeholder="Teléfono" class="border p-2 rounded">
+                <input type="email" name="email" placeholder="Email de contacto (a donde llegan las postulaciones)" required class="border p-2 rounded md:col-span-3">
+                <button type="submit" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 rounded md:col-span-3">Guardar Instituto</button>
+            </form>
+        </div>
+
+        <!-- Listado -->
+        <h2 class="text-lg font-bold text-purple-900 mb-4">Institutos Registrados</h2>
+        <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse text-xs">
+                <thead>
+                    <tr class="bg-purple-50 text-purple-900 border-b">
+                        <th class="p-3">N° IES</th>
+                        <th class="p-3">Nombre</th>
+                        <th class="p-3">Localidad</th>
+                        <th class="p-3">Dirección</th>
+                        <th class="p-3">Teléfono</th>
+                        <th class="p-3">Email de Contacto</th>
+                        <th class="p-3 text-center">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y">
+                    {% for i in institutos %}
+                    <tr class="hover:bg-slate-50">
+                        <td class="p-2"><input type="text" name="numero_ies" value="{{ i.numero_ies }}" form="form-edit-{{ i.id }}" class="border p-1 rounded w-20"></td>
+                        <td class="p-2"><input type="text" name="nombre" value="{{ i.nombre }}" form="form-edit-{{ i.id }}" class="border p-1 rounded w-48"></td>
+                        <td class="p-2"><input type="text" name="localidad" value="{{ i.localidad }}" form="form-edit-{{ i.id }}" class="border p-1 rounded w-28"></td>
+                        <td class="p-2"><input type="text" name="direccion" value="{{ i.direccion or '' }}" form="form-edit-{{ i.id }}" class="border p-1 rounded w-32"></td>
+                        <td class="p-2"><input type="text" name="telefono" value="{{ i.telefono or '' }}" form="form-edit-{{ i.id }}" class="border p-1 rounded w-24"></td>
+                        <td class="p-2"><input type="email" name="email" value="{{ i.email }}" form="form-edit-{{ i.id }}" class="border p-1 rounded w-56 font-semibold"></td>
+                        <td class="p-2 text-center whitespace-nowrap">
+                            <form id="form-edit-{{ i.id }}" action="/admin/instituciones/editar/{{ i.id }}" method="POST" style="display:inline"></form>
+                            <button type="submit" form="form-edit-{{ i.id }}" class="bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded shadow-sm">Guardar</button>
+                            <form action="/admin/instituciones/borrar/{{ i.id }}" method="POST" class="inline" onsubmit="return confirm('¿Eliminar este instituto? Las materias vinculadas quedarán sin instituto.');">
+                                <button type="submit" class="bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded shadow-sm">Borrar</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="7" class="p-4 text-center text-slate-400 italic">No hay institutos registrados todavía. Cargá el primero arriba.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </main>
+</body>
+</html>
