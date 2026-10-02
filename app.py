@@ -248,7 +248,10 @@ def init_db():
     sql_postulaciones_obs = "ALTER TABLE postulaciones_docentes ADD COLUMN IF NOT EXISTS observaciones TEXT DEFAULT '';"
     sql_postulaciones_est = "ALTER TABLE postulaciones_docentes ADD COLUMN IF NOT EXISTS estado_inscripcion VARCHAR(50) DEFAULT 'PENDIENTE';"
 
-    queries = [sql_institutos, sql_materias, sql_postulaciones_obs, sql_postulaciones_est]
+    # 4. Campo "vigente" para las materias/carreras del nomenclador
+    sql_materias_vigente = "ALTER TABLE materias_nomenclador ADD COLUMN IF NOT EXISTS vigente VARCHAR(10) DEFAULT 'Sí';"
+
+    queries = [sql_institutos, sql_materias, sql_postulaciones_obs, sql_postulaciones_est, sql_materias_vigente]
     
     for query in queries:
         try:
@@ -422,27 +425,39 @@ def borrar_institucion(id):
     except Exception as e:
         return f"Error al borrar el instituto: {e}", 500
 
-# --- GESTIÓN DE INSTITUTOS Y CARRERAS (ADMIN) ---
+# --- LISTADO DE CARRERAS Y RESOLUCIONES VINCULARES (ADMIN) ---
+# Antes leía de una planilla Excel aparte ("institutos_carreras"), desconectada de todo.
+# Ahora se arma directo desde el Nomenclador (materias_nomenclador + institutos), así que
+# cualquier instituto o materia que cargues en las otras pantallas aparece acá automáticamente.
 @app.route('/admin/institutos')
 def admin_institutos():
     if not supabase:
         return "Supabase no configurado."
-    datos = supabase.table('institutos_carreras').select('*').execute().data
-    return render_template('admin_institutos.html', institutos=datos)
+    datos = supabase.table('materias_nomenclador').select('*, institutos(*)').order('id', desc=True).execute().data
+    return render_template('admin_institutos.html', materias=datos)
 
 @app.route('/admin/institutos/editar/<int:id>', methods=['POST'])
 def editar_instituto(id):
     try:
-        supabase.table('institutos_carreras').update({
-            "nombre_instituto": request.form.get('nombre_instituto'),
+        supabase.table('materias_nomenclador').update({
             "carrera": request.form.get('carrera'),
-            "resolucion_carrera": request.form.get('resolucion_carrera'),
-            "localidad": request.form.get('localidad'),
+            "resolucion": request.form.get('resolucion'),
+            "codigo": request.form.get('codigo'),
+            "nombre_unidad_curricular": request.form.get('nombre_unidad_curricular'),
+            "regimen": request.form.get('regimen'),
             "vigente": request.form.get('vigente')
         }).eq('id', id).execute()
         return redirect(url_for('admin_institutos'))
     except Exception as e:
         return f"Error al actualizar: {e}", 500
+
+@app.route('/admin/institutos/borrar/<int:id>', methods=['POST'])
+def borrar_materia(id):
+    try:
+        supabase.table('materias_nomenclador').delete().eq('id', id).execute()
+        return redirect(url_for('admin_institutos'))
+    except Exception as e:
+        return f"Error al borrar: {e}", 500
 
 # --- SEGUIMIENTO DE INSCRIPCIONES DOCENTES (ADMIN) ---
 @app.route('/admin/seguimiento')
