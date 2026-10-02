@@ -105,15 +105,23 @@
     </main>
 
     <script>
+        // Quita tildes/diacríticos y pasa a minúsculas, para que "Orán" matchee con "oran".
+        function normalizarTexto(str) {
+            return (str || '')
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .toLowerCase();
+        }
+
         function filtrarTabla() {
             const input = document.getElementById('searchInput');
-            const filtro = input.value.toLowerCase();
+            const filtro = normalizarTexto(input.value);
             const filas = document.querySelectorAll('.fila-postulante');
 
             filas.forEach(fila => {
-                const nombre = fila.querySelector('.nombre-docente').textContent.toLowerCase();
-                const localidad = fila.querySelector('.localidad-docente').textContent.toLowerCase();
-                const titulos = fila.querySelector('.titulos-docente').textContent.toLowerCase();
+                const nombre = normalizarTexto(fila.querySelector('.nombre-docente').textContent);
+                const localidad = normalizarTexto(fila.querySelector('.localidad-docente').textContent);
+                const titulos = normalizarTexto(fila.querySelector('.titulos-docente').textContent);
 
                 if (nombre.includes(filtro) || localidad.includes(filtro) || titulos.includes(filtro)) {
                     fila.style.display = "";

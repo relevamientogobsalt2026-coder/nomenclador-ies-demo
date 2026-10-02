@@ -1,5 +1,6 @@
 import os
 import uuid
+import unicodedata
 import urllib.parse
 from io import BytesIO
 from datetime import datetime
@@ -22,6 +23,15 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY) if SUPABASE_URL els
 # Bucket de Supabase Storage donde se guardan los documentos de los postulantes.
 # Tiene que existir y estar configurado como público (ver instrucciones).
 BUCKET_DOCUMENTOS = "documentos-postulantes"
+
+def normalizar(texto):
+    """Pasa el texto a minúsculas y le quita tildes/diacríticos, para poder comparar
+    o filtrar sin que 'Orán' != 'oran' o 'Profesorado' != 'profesorado' rompan el match."""
+    if not texto:
+        return ""
+    texto = str(texto).strip().lower()
+    texto = unicodedata.normalize('NFKD', texto)
+    return ''.join(c for c in texto if not unicodedata.combining(c))
 
 def subir_archivo(file_storage, subcarpeta):
     """Sube un archivo adjunto del formulario a Supabase Storage y devuelve su URL pública.
@@ -72,6 +82,8 @@ def generar_comprobante_pdf(docente, materias_habilitadas):
         alto_logo = ancho_logo * (103 / 370)  # mantiene la proporción real del logo
         story.append(RLImage(LOGO_PATH, width=ancho_logo, height=alto_logo))
         story.append(Spacer(1, 10))
+    else:
+        print(f"AVISO: no se encontró el logo en {LOGO_PATH}. El comprobante se genera sin logo.")
 
     story.append(Paragraph("Comprobante de Inscripción Docente", titulo_style))
     story.append(Paragraph(
@@ -86,22 +98,23 @@ def generar_comprobante_pdf(docente, materias_habilitadas):
     story.append(Spacer(1, 10))
 
     localidades = docente.get('localidades_postulacion') or []
+    label_bold_style = ParagraphStyle('LabelBold', parent=styles['Normal'], fontSize=10,
+                                       textColor=colors.HexColor('#4c1d95'), fontName='Helvetica-Bold')
+    valor_style = ParagraphStyle('Valor', parent=styles['Normal'], fontSize=10,
+                                  textColor=colors.HexColor('#334155'))
     datos = [
-        ["Nombre y Apellido:", docente.get('nombre_apellido') or ''],
-        ["DNI:", docente.get('dni') or ''],
-        ["Teléfono:", docente.get('telefono') or ''],
-        ["Email:", docente.get('email') or ''],
-        ["Localidades postuladas:", ", ".join(localidades)],
-        ["Título 1:", f"{docente.get('titulo_base_1') or ''} ({docente.get('anio_egreso_1') or ''})"],
+        [Paragraph("Nombre y Apellido:", label_bold_style), Paragraph(docente.get('nombre_apellido') or '', valor_style)],
+        [Paragraph("DNI:", label_bold_style), Paragraph(docente.get('dni') or '', valor_style)],
+        [Paragraph("Teléfono:", label_bold_style), Paragraph(docente.get('telefono') or '', valor_style)],
+        [Paragraph("Email:", label_bold_style), Paragraph(docente.get('email') or '', valor_style)],
+        [Paragraph("Localidades postuladas:", label_bold_style), Paragraph(", ".join(localidades), valor_style)],
+        [Paragraph("Título 1:", label_bold_style), Paragraph(f"{docente.get('titulo_base_1') or ''} ({docente.get('anio_egreso_1') or ''})", valor_style)],
     ]
     if docente.get('titulo_base_2'):
-        datos.append(["Título 2:", f"{docente.get('titulo_base_2')} ({docente.get('anio_egreso_2') or ''})"])
+        datos.append([Paragraph("Título 2:", label_bold_style), Paragraph(f"{docente.get('titulo_base_2')} ({docente.get('anio_egreso_2') or ''})", valor_style)])
 
     tabla_datos = Table(datos, colWidths=[50 * mm, 110 * mm])
     tabla_datos.setStyle(TableStyle([
-        ('FONTSIZE', (0, 0), (-1, -1), 10),
-        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
-        ('TEXTCOLOR', (0, 0), (0, -1), colors.HexColor('#4c1d95')),
         ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
         ('TOPPADDING', (0, 0), (-1, -1), 2),
         ('VALIGN', (0, 0), (-1, -1), 'TOP'),
@@ -112,24 +125,35 @@ def generar_comprobante_pdf(docente, materias_habilitadas):
     story.append(Paragraph("Unidades Curriculares Habilitadas", h2_style))
     story.append(Spacer(1, 6))
 
+    celda_style = ParagraphStyle('Celda', parent=styles['Normal'], fontSize=8,
+                                  textColor=colors.HexColor('#1e293b'), leading=10)
+    celda_header_style = ParagraphStyle('CeldaHeader', parent=styles['Normal'], fontSize=8,
+                                         textColor=colors.HexColor('#4c1d95'), fontName='Helvetica-Bold', leading=10)
+
     if materias_habilitadas:
-        filas = [["Código", "Unidad Curricular", "Carrera", "Instituto"]]
+        filas = [[
+            Paragraph("Código", celda_header_style),
+            Paragraph("Unidad Curricular", celda_header_style),
+            Paragraph("Carrera", celda_header_style),
+            Paragraph("Instituto", celda_header_style),
+        ]]
         for m in materias_habilitadas:
             inst = m.get('institutos') or {}
             filas.append([
-                m.get('codigo') or '',
-                m.get('nombre_unidad_curricular') or '',
-                m.get('carrera') or '',
-                inst.get('nombre') or ''
+                Paragraph(m.get('codigo') or '', celda_style),
+                Paragraph(m.get('nombre_unidad_curricular') or '', celda_style),
+                Paragraph(m.get('carrera') or '', celda_style),
+                Paragraph(inst.get('nombre') or '', celda_style)
             ])
-        tabla_mat = Table(filas, colWidths=[18 * mm, 55 * mm, 47 * mm, 40 * mm])
+        tabla_mat = Table(filas, colWidths=[18 * mm, 50 * mm, 47 * mm, 45 * mm])
         tabla_mat.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#ede9fe')),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.HexColor('#4c1d95')),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, -1), 8),
             ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#cbd5e1')),
             ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('TOPPADDING', (0, 0), (-1, -1), 5),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+            ('LEFTPADDING', (0, 0), (-1, -1), 5),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 5),
             ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f8fafc')]),
         ]))
         story.append(tabla_mat)
@@ -293,13 +317,13 @@ def postular():
     inserted = supabase.table('postulaciones_docentes').insert(post_data).execute()
     postulante_id = inserted.data[0]['id']
 
-    titulos_docente = [t.strip().lower() for t in [titulo_1, titulo_2] if t]
+    titulos_docente = [normalizar(t) for t in [titulo_1, titulo_2] if t]
     all_materias = supabase.table('materias_nomenclador').select('*, institutos(*)').execute().data
     
     materias_habilitadas = []
     
     for mat in all_materias:
-        habilitantes = [h.lower() for h in mat.get('titulos_habilitantes', [])]
+        habilitantes = [normalizar(h) for h in mat.get('titulos_habilitantes', [])]
         es_hab = any(any(t in hab or hab in t for hab in habilitantes) for t in titulos_docente)
         
         if es_hab:
