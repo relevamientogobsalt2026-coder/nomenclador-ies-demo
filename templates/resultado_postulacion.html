@@ -53,15 +53,43 @@
         <p class="text-red-500 my-4 font-semibold">No se encontraron materias compatibles para los títulos ingresados.</p>
         {% endif %}
 
+        {% if institutos_involucrados|length > 1 %}
+        <div class="mb-4 bg-indigo-50 border border-indigo-200 rounded-lg p-4">
+            <label for="selectInstituto" class="block text-sm font-semibold text-indigo-900 mb-2">
+                Tiene materias habilitadas en más de un instituto. Elija a cuál enviar la postulación por correo:
+            </label>
+            <select id="selectInstituto" class="w-full md:w-96 border p-2 rounded-lg text-sm">
+                {% for inst in institutos_involucrados %}
+                <option value="{{ inst.id }}">{{ inst.nombre }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        {% endif %}
+
         <div class="flex flex-wrap gap-4">
             <a href="{{ url_for('comprobante_pdf', postulante_id=postulante_id) }}" class="bg-purple-700 hover:bg-purple-800 text-white px-6 py-2 rounded text-sm font-semibold">
                 📄 Descargar Comprobante (PDF)
             </a>
-            <a href="{{ mailto_link }}" class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded text-sm font-semibold">
+            <button type="button" id="btnEnviarCorreo" class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded text-sm font-semibold">
                 ✉️ Enviar Postulación al Correo Institucional
-            </a>
+            </button>
             <a href="/" class="bg-slate-200 text-slate-700 px-6 py-2 rounded text-sm font-semibold">Volver al Inicio</a>
         </div>
     </div>
+
+    <script>
+        const mailtoLinks = {{ mailto_links | tojson }};
+
+        document.getElementById('btnEnviarCorreo').addEventListener('click', function () {
+            const selector = document.getElementById('selectInstituto');
+            const clave = selector ? selector.value : 'default';
+            const link = mailtoLinks[clave] || mailtoLinks['default'] || Object.values(mailtoLinks)[0];
+            if (link) {
+                window.location.href = link;
+            } else {
+                alert('No se pudo armar el correo. Contacte al instituto manualmente.');
+            }
+        });
+    </script>
 </body>
 </html>

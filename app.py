@@ -178,9 +178,20 @@ def generar_comprobante_pdf(docente, materias_habilitadas):
     buffer.seek(0)
     return buffer
 
-def armar_mailto(docente, materias_habilitadas):
+def armar_mailto(docente, materias_habilitadas, instituto_id=None):
     """Arma un link mailto: con asunto y cuerpo pre-cargados con los datos del postulante
-    y las materias habilitadas, dirigido al email del instituto correspondiente."""
+    y las materias habilitadas, dirigido al email del instituto correspondiente.
+
+    Si se pasa instituto_id, filtra las materias para armar el correo solo con
+    las que correspondan a ESE instituto puntual (para cuando el docente tiene
+    materias habilitadas en más de un IES y hay que elegir a cuál enviar)."""
+    materias_filtradas = materias_habilitadas
+    if instituto_id:
+        materias_filtradas = [
+            m for m in materias_habilitadas
+            if m.get('institutos') and str(m['institutos'].get('id')) == str(instituto_id)
+        ]
+
     asunto = f"Postulación Docente - {docente.get('nombre_apellido')} (DNI: {docente.get('dni')})"
 
     lineas = [
@@ -194,11 +205,11 @@ def armar_mailto(docente, materias_habilitadas):
         lineas.append(f"Título 2: {docente.get('titulo_base_2')} ({docente.get('anio_egreso_2')})")
     lineas.append("")
 
-    if materias_habilitadas:
+    if materias_filtradas:
         lineas.append("Unidades curriculares habilitadas según nomenclador:")
-        for m in materias_habilitadas:
+        for m in materias_filtradas:
             lineas.append(f"- {m.get('codigo')} | {m.get('nombre_unidad_curricular')} ({m.get('carrera')})")
-        email_destino = materias_habilitadas[0].get('institutos', {}).get('email') or 'ies6039aguaray@gmail.com'
+        email_destino = materias_filtradas[0].get('institutos', {}).get('email') or 'ies6039aguaray@gmail.com'
     else:
         lineas.append("No se encontraron materias compatibles en el nomenclador para los títulos ingresados.")
         email_destino = 'ies6039aguaray@gmail.com'
@@ -343,10 +354,30 @@ def postular():
                 "estado_habilitacion": "HABILITADO"
             }).execute()
 
-    return render_template('resultado_postulacion.html', 
-                           docente=post_data, 
+    # Armar lista de institutos involucrados (para elegir a quién enviar el correo
+    # cuando el docente tiene materias habilitadas en más de un instituto)
+    institutos_vistos = {}
+    for m in materias_habilitadas:
+        inst = m.get('institutos')
+        if inst and inst.get('id') is not None:
+            institutos_vistos[inst['id']] = {
+                'id': inst['id'],
+                'nombre': inst.get('nombre', 'Instituto sin nombre')
+            }
+    institutos_involucrados = list(institutos_vistos.values())
+
+    mailto_links = {}
+    if institutos_involucrados:
+        for inst in institutos_involucrados:
+            mailto_links[str(inst['id'])] = armar_mailto(post_data, materias_habilitadas, instituto_id=inst['id'])
+    else:
+        mailto_links['default'] = armar_mailto(post_data, materias_habilitadas)
+
+    return render_template('resultado_postulacion.html',
+                           docente=post_data,
                            materias=materias_habilitadas,
-                           mailto_link=armar_mailto(post_data, materias_habilitadas),
+                           mailto_links=mailto_links,
+                           institutos_involucrados=institutos_involucrados,
                            postulante_id=postulante_id)
 
 # 3. SECCIÓN ADMINISTRADOR: Nomenclador y Estadísticas
@@ -484,53 +515,4 @@ def editar_postulacion(id):
     except Exception as e:
         return f"Error al actualizar postulación: {e}", 500
 
-@app.route('/admin/postulacion/borrar/<int:id>', methods=['POST'])
-def borrar_postulacion(id):
-    try:
-        supabase.table('postulaciones_docentes').delete().eq('id', id).execute()
-        return redirect(url_for('admin_seguimiento'))
-    except Exception as e:
-        return f"Error al borrar postulación: {e}", 500
-
-# --- COMPROBANTE DE INSCRIPCIÓN (PDF DESCARGABLE) ---
-@app.route('/comprobante/<int:postulante_id>')
-def comprobante_pdf(postulante_id):
-    if not supabase:
-        return "Supabase no configurado.", 500
-
-    response = supabase.table('postulaciones_docentes').select('*').eq('id', postulante_id).execute()
-    if not response.data:
-        abort(404)
-    docente = response.data[0]
-
-    historial = supabase.table('historial_relevamiento') \
-        .select('materia_id, materias_nomenclador(*, institutos(*))') \
-        .eq('postulante_id', postulante_id).execute()
-    materias_habilitadas = [item['materias_nomenclador'] for item in historial.data if item.get('materias_nomenclador')]
-
-    buffer = generar_comprobante_pdf(docente, materias_habilitadas)
-    nombre_archivo = f"comprobante_inscripcion_{docente.get('dni') or postulante_id}.pdf"
-    return send_file(buffer, mimetype='application/pdf', as_attachment=True, download_name=nombre_archivo)
-
-# --- NUEVA RUTA: DETALLE INDIVIDUAL DEL POSTULANTE ---
-@app.route('/postulante/<int:docente_id>')
-def detalle_postulante(docente_id):
-    if not supabase:
-        return "Supabase no configurado.", 500
-    
-    # Busca los datos principales del postulante
-    response = supabase.table('postulaciones_docentes').select('*').eq('id', docente_id).execute()
-    
-    if not response.data:
-        abort(404)
-        
-    docente = response.data[0]
-
-    # Opcional: Buscar también las materias habilitadas en el historial para mostrarlas en la ficha
-    historial = supabase.table('historial_relevamiento').select('materia_id, materias_nomenclador(nombre_unidad_curricular)').eq('postulante_id', docente_id).execute()
-    docente['materias_habilitadas'] = [item['materias_nomenclador'] for item in historial.data if item.get('materias_nomenclador')]
-    
-    return render_template('detalle_postulante.html', docente=docente)
-
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=10000)
+@app.route('/admin/postulacion/borrar/<
