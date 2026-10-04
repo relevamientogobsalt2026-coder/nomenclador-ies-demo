@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <title>Institutos - Emails de Contacto</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </head>
 <body class="bg-slate-100 text-slate-800 min-h-screen">
     <header class="bg-purple-900 text-white p-4 shadow">
@@ -31,15 +33,16 @@
                 <input type="text" name="direccion" placeholder="Dirección" class="border p-2 rounded">
                 <input type="text" name="telefono" placeholder="Teléfono" class="border p-2 rounded">
                 <input type="email" name="email" placeholder="Email de contacto (a donde llegan las postulaciones)" required class="border p-2 rounded md:col-span-3">
-                <div class="md:col-span-3">
-                    <p class="text-slate-500 mb-1">
-                        📍 Coordenadas para el mapa (opcional). Buscá el instituto en
-                        <a href="https://www.google.com/maps" target="_blank" class="text-indigo-600 underline">Google Maps</a>,
-                        hacé clic derecho sobre el edificio y copiá los dos números que aparecen (ej: -24.7821, -64.5981).
-                    </p>
+
+                <div class="md:col-span-3 flex items-center gap-3 bg-slate-50 border rounded p-2">
+                    <button type="button" onclick="abrirMapaUbicacion('nuevo')" class="bg-teal-600 hover:bg-teal-700 text-white px-3 py-1.5 rounded font-semibold whitespace-nowrap">
+                        📍 Ubicar en el mapa
+                    </button>
+                    <span id="coordsTexto-nuevo" class="text-slate-500">Todavía no se marcó ninguna ubicación (opcional).</span>
+                    <input type="hidden" name="latitud" id="latitud-nuevo">
+                    <input type="hidden" name="longitud" id="longitud-nuevo">
                 </div>
-                <input type="text" name="latitud" placeholder="Latitud (ej: -24.7821)" class="border p-2 rounded">
-                <input type="text" name="longitud" placeholder="Longitud (ej: -64.5981)" class="border p-2 rounded md:col-span-2">
+
                 <button type="submit" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 rounded md:col-span-3">Guardar Instituto</button>
             </form>
         </div>
@@ -56,8 +59,7 @@
                         <th class="p-3">Dirección</th>
                         <th class="p-3">Teléfono</th>
                         <th class="p-3">Email de Contacto</th>
-                        <th class="p-3">Latitud</th>
-                        <th class="p-3">Longitud</th>
+                        <th class="p-3">Ubicación</th>
                         <th class="p-3 text-center">Acciones</th>
                     </tr>
                 </thead>
@@ -70,8 +72,16 @@
                         <td class="p-2"><input type="text" name="direccion" value="{{ i.direccion or '' }}" form="form-edit-{{ i.id }}" class="border p-1 rounded w-32"></td>
                         <td class="p-2"><input type="text" name="telefono" value="{{ i.telefono or '' }}" form="form-edit-{{ i.id }}" class="border p-1 rounded w-24"></td>
                         <td class="p-2"><input type="email" name="email" value="{{ i.email }}" form="form-edit-{{ i.id }}" class="border p-1 rounded w-56 font-semibold"></td>
-                        <td class="p-2"><input type="text" name="latitud" value="{{ i.latitud if i.latitud is not none else '' }}" form="form-edit-{{ i.id }}" class="border p-1 rounded w-24" placeholder="-24.78"></td>
-                        <td class="p-2"><input type="text" name="longitud" value="{{ i.longitud if i.longitud is not none else '' }}" form="form-edit-{{ i.id }}" class="border p-1 rounded w-24" placeholder="-64.59"></td>
+                        <td class="p-2">
+                            <button type="button" onclick="abrirMapaUbicacion('{{ i.id }}', {{ i.latitud if i.latitud is not none else 'null' }}, {{ i.longitud if i.longitud is not none else 'null' }})" class="bg-teal-600 hover:bg-teal-700 text-white px-2 py-1 rounded whitespace-nowrap">
+                                📍 Ubicar
+                            </button>
+                            <div id="coordsTexto-{{ i.id }}" class="text-slate-500 mt-1">
+                                {% if i.latitud and i.longitud %}{{ "%.4f"|format(i.latitud) }}, {{ "%.4f"|format(i.longitud) }}{% else %}Sin ubicar{% endif %}
+                            </div>
+                            <input type="hidden" name="latitud" id="latitud-{{ i.id }}" value="{{ i.latitud if i.latitud is not none else '' }}" form="form-edit-{{ i.id }}">
+                            <input type="hidden" name="longitud" id="longitud-{{ i.id }}" value="{{ i.longitud if i.longitud is not none else '' }}" form="form-edit-{{ i.id }}">
+                        </td>
                         <td class="p-2 text-center whitespace-nowrap">
                             <form id="form-edit-{{ i.id }}" action="/admin/instituciones/editar/{{ i.id }}" method="POST" style="display:inline"></form>
                             <button type="submit" form="form-edit-{{ i.id }}" class="bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded shadow-sm">Guardar</button>
@@ -81,11 +91,98 @@
                         </td>
                     </tr>
                     {% else %}
-                    <tr><td colspan="9" class="p-4 text-center text-slate-400 italic">No hay institutos registrados todavía. Cargá el primero arriba.</td></tr>
+                    <tr><td colspan="8" class="p-4 text-center text-slate-400 italic">No hay institutos registrados todavía. Cargá el primero arriba.</td></tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
     </main>
+
+    <!-- Modal del mapa para elegir ubicación -->
+    <div id="modalMapa" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-xl shadow-xl w-full max-w-2xl p-4">
+            <div class="flex justify-between items-center mb-3">
+                <h3 class="font-bold text-purple-900">Hacé clic sobre el mapa para marcar la ubicación del instituto</h3>
+                <button type="button" onclick="cerrarMapaUbicacion()" class="text-slate-500 hover:text-slate-800 text-xl leading-none">&times;</button>
+            </div>
+            <div id="mapaSelector" style="height: 400px; border-radius: 0.5rem;"></div>
+            <p class="text-xs text-slate-500 mt-2">Podés mover el mapa y acercar el zoom antes de hacer clic para ubicar el punto exacto.</p>
+            <div class="flex justify-end gap-2 mt-4">
+                <button type="button" onclick="cerrarMapaUbicacion()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 px-4 py-2 rounded text-sm font-semibold">Cancelar</button>
+                <button type="button" onclick="confirmarUbicacion()" class="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded text-sm font-semibold">Confirmar ubicación</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let mapaSelector = null;
+        let marcadorSelector = null;
+        let targetActual = null;
+        let coordsElegidas = null;
+
+        function abrirMapaUbicacion(targetId, latExistente, lonExistente) {
+            targetActual = targetId;
+            coordsElegidas = null;
+            document.getElementById('modalMapa').classList.remove('hidden');
+            document.getElementById('modalMapa').classList.add('flex');
+
+            // Hay que esperar a que el modal sea visible antes de inicializar Leaflet,
+            // si no el mapa se ve cortado/gris.
+            setTimeout(() => {
+                const centroInicial = (latExistente && lonExistente) ? [latExistente, lonExistente] : [-24.78, -64.6];
+                const zoomInicial = (latExistente && lonExistente) ? 15 : 7;
+
+                if (!mapaSelector) {
+                    mapaSelector = L.map('mapaSelector').setView(centroInicial, zoomInicial);
+                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                        maxZoom: 19,
+                        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                    }).addTo(mapaSelector);
+
+                    mapaSelector.on('click', function(e) {
+                        colocarMarcador(e.latlng.lat, e.latlng.lng);
+                    });
+                } else {
+                    mapaSelector.setView(centroInicial, zoomInicial);
+                    mapaSelector.invalidateSize();
+                }
+
+                if (marcadorSelector) {
+                    mapaSelector.removeLayer(marcadorSelector);
+                    marcadorSelector = null;
+                }
+
+                if (latExistente && lonExistente) {
+                    colocarMarcador(latExistente, lonExistente);
+                }
+            }, 100);
+        }
+
+        function colocarMarcador(lat, lon) {
+            if (marcadorSelector) {
+                mapaSelector.removeLayer(marcadorSelector);
+            }
+            marcadorSelector = L.marker([lat, lon]).addTo(mapaSelector);
+            coordsElegidas = { lat: lat, lon: lon };
+        }
+
+        function cerrarMapaUbicacion() {
+            document.getElementById('modalMapa').classList.add('hidden');
+            document.getElementById('modalMapa').classList.remove('flex');
+            targetActual = null;
+        }
+
+        function confirmarUbicacion() {
+            if (!coordsElegidas) {
+                alert('Hacé clic sobre el mapa para marcar un punto antes de confirmar.');
+                return;
+            }
+            document.getElementById('latitud-' + targetActual).value = coordsElegidas.lat;
+            document.getElementById('longitud-' + targetActual).value = coordsElegidas.lon;
+            document.getElementById('coordsTexto-' + targetActual).textContent =
+                coordsElegidas.lat.toFixed(4) + ', ' + coordsElegidas.lon.toFixed(4);
+            cerrarMapaUbicacion();
+        }
+    </script>
 </body>
 </html>
