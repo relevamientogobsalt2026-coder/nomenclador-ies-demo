@@ -22,14 +22,13 @@
     <div class="card">
         <h1>Legajo de Postulante - {{ docente.nombre_apellido }}</h1>
         
-        <!-- Ficha Completa -->
         <div class="info-group">
             <p><span class="label">Identificación / ID:</span> {{ docente.id }}</p>
             <p><span class="label">Correo Electrónico:</span> {{ docente.email }}</p>
             <p><span class="label">Teléfono:</span> {{ docente.telefono }}</p>
+            {% if docente.domicilio %}<p><span class="label">Domicilio:</span> {{ docente.domicilio }}</p>{% endif %}
         </div>
 
-        <!-- Materias Habilitadas -->
         <div class="info-group">
             <h3>Materias Habilitadas</h3>
             <ul>
@@ -41,7 +40,6 @@
             </ul>
         </div>
 
-        <!-- Documentos Adjuntos -->
         <div class="info-group">
             <h3>Documentos Adjuntos</h3>
             <div class="btn-container" style="flex-wrap: wrap;">

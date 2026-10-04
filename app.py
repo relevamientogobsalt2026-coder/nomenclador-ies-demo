@@ -107,6 +107,7 @@ def generar_comprobante_pdf(docente, materias_habilitadas):
         [Paragraph("DNI:", label_bold_style), Paragraph(docente.get('dni') or '', valor_style)],
         [Paragraph("Teléfono:", label_bold_style), Paragraph(docente.get('telefono') or '', valor_style)],
         [Paragraph("Email:", label_bold_style), Paragraph(docente.get('email') or '', valor_style)],
+        [Paragraph("Domicilio:", label_bold_style), Paragraph(docente.get('domicilio') or '', valor_style)],
         [Paragraph("Localidades postuladas:", label_bold_style), Paragraph(", ".join(localidades), valor_style)],
         [Paragraph("Título 1:", label_bold_style), Paragraph(f"{docente.get('titulo_base_1') or ''} ({docente.get('anio_egreso_1') or ''})", valor_style)],
     ]
@@ -251,7 +252,10 @@ def init_db():
     # 4. Campo "vigente" para las materias/carreras del nomenclador
     sql_materias_vigente = "ALTER TABLE materias_nomenclador ADD COLUMN IF NOT EXISTS vigente VARCHAR(10) DEFAULT 'Sí';"
 
-    queries = [sql_institutos, sql_materias, sql_postulaciones_obs, sql_postulaciones_est, sql_materias_vigente]
+    # 5. Domicilio del docente postulante
+    sql_postulaciones_domicilio = "ALTER TABLE postulaciones_docentes ADD COLUMN IF NOT EXISTS domicilio VARCHAR(255);"
+
+    queries = [sql_institutos, sql_materias, sql_postulaciones_obs, sql_postulaciones_est, sql_materias_vigente, sql_postulaciones_domicilio]
     
     for query in queries:
         try:
@@ -281,6 +285,7 @@ def postular():
     dni = request.form.get('dni')
     telefono = request.form.get('telefono')
     email = request.form.get('email')
+    domicilio = request.form.get('domicilio')
     localidades = request.form.getlist('localidades')
     
     titulo_1 = request.form.get('titulo_base_1')
@@ -303,6 +308,7 @@ def postular():
         "dni": dni,
         "telefono": telefono,
         "email": email,
+        "domicilio": domicilio,
         "localidades_postulacion": localidades,
         "titulo_base_1": titulo_1,
         "anio_egreso_1": int(egreso_1) if egreso_1 else None,

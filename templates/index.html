@@ -41,8 +41,23 @@
                         <input type="email" name="email" required class="w-full border p-2 rounded text-sm">
                     </div>
                     <div class="md:col-span-2">
-                        <label class="block text-xs font-semibold mb-1">Localidades a Postularse (Seleccione hasta 2)</label>
-                        <div class="grid grid-cols-2 md:grid-cols-3 gap-3 p-3 border rounded-lg bg-slate-50">
+                        <label class="block text-xs font-semibold mb-1">Domicilio</label>
+                        <input type="text" name="domicilio" placeholder="Calle, número, barrio, localidad" class="w-full border p-2 rounded text-sm">
+                    </div>
+                    <div class="md:col-span-2">
+                        <div class="flex items-center justify-between mb-1">
+                            <label class="block text-xs font-semibold">Localidades a Postularse (Seleccione hasta 2)</label>
+                            <label class="inline-flex items-center gap-2 text-xs text-slate-600 cursor-pointer select-none">
+                                <span>Obligatorio</span>
+                                <span class="relative inline-block w-9 h-5">
+                                    <input type="checkbox" id="toggleLocalidades" class="peer sr-only">
+                                    <span class="absolute inset-0 bg-slate-300 peer-checked:bg-indigo-600 rounded-full transition-colors cursor-pointer" onclick="document.getElementById('toggleLocalidades').click()"></span>
+                                    <span class="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full transition-transform peer-checked:translate-x-4 pointer-events-none"></span>
+                                </span>
+                                <span>Opcional</span>
+                            </label>
+                        </div>
+                        <div id="bloqueLocalidades" class="grid grid-cols-2 md:grid-cols-3 gap-3 p-3 border rounded-lg bg-slate-50">
                             <label class="inline-flex items-center space-x-2 text-sm text-slate-700 cursor-pointer">
                                 <input type="checkbox" name="localidades" value="Aguaray" checked class="localidad-checkbox h-4 w-4 text-indigo-600 rounded focus:ring-indigo-500">
                                 <span>Aguaray</span>
@@ -64,6 +79,7 @@
                                 <span>Metán</span>
                             </label>
                         </div>
+                        <p id="avisoLocalidadesOpcional" class="text-xs text-slate-400 italic mt-1 hidden">La selección de localidades es opcional — puede continuar sin marcar ninguna.</p>
                     </div>
                 </div>
             </div>
@@ -132,6 +148,21 @@
                     this.checked = false;
                     alert('Solo puede seleccionar hasta 2 localidades.');
                 }
+            });
+        });
+
+        // Toggle de prueba: muestra cómo quedaría si la selección de localidades fuera opcional.
+        // Es solo visual/de diseño — el sistema no exige mínimo de localidades en ningún caso.
+        const toggleLocalidades = document.getElementById('toggleLocalidades');
+        const bloqueLocalidades = document.getElementById('bloqueLocalidades');
+        const avisoOpcional = document.getElementById('avisoLocalidadesOpcional');
+
+        toggleLocalidades.addEventListener('change', function() {
+            const esOpcional = this.checked;
+            bloqueLocalidades.classList.toggle('opacity-50', esOpcional);
+            avisoOpcional.classList.toggle('hidden', !esOpcional);
+            document.querySelectorAll('.localidad-checkbox').forEach(cb => {
+                cb.disabled = esOpcional;
             });
         });
     </script>
