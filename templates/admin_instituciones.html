@@ -13,6 +13,7 @@
                 <a href="/admin" class="bg-purple-700 hover:bg-purple-600 px-3 py-1.5 rounded text-xs font-semibold whitespace-nowrap">Nomenclador y Materias</a>
                 <a href="/admin/institutos" class="bg-amber-600 hover:bg-amber-700 px-3 py-1.5 rounded text-xs font-semibold whitespace-nowrap">📋 Planilla IES y Carreras</a>
                 <a href="/admin/seguimiento" class="bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 rounded text-xs font-semibold whitespace-nowrap">📊 Seguimiento</a>
+                <a href="/mapa" class="bg-teal-600 hover:bg-teal-700 px-3 py-1.5 rounded text-xs font-semibold whitespace-nowrap">🗺️ Ver Mapa</a>
                 <a href="/" class="bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded text-xs whitespace-nowrap">🌐 Ir al Sitio</a>
             </div>
         </div>
@@ -30,6 +31,15 @@
                 <input type="text" name="direccion" placeholder="Dirección" class="border p-2 rounded">
                 <input type="text" name="telefono" placeholder="Teléfono" class="border p-2 rounded">
                 <input type="email" name="email" placeholder="Email de contacto (a donde llegan las postulaciones)" required class="border p-2 rounded md:col-span-3">
+                <div class="md:col-span-3">
+                    <p class="text-slate-500 mb-1">
+                        📍 Coordenadas para el mapa (opcional). Buscá el instituto en
+                        <a href="https://www.google.com/maps" target="_blank" class="text-indigo-600 underline">Google Maps</a>,
+                        hacé clic derecho sobre el edificio y copiá los dos números que aparecen (ej: -24.7821, -64.5981).
+                    </p>
+                </div>
+                <input type="text" name="latitud" placeholder="Latitud (ej: -24.7821)" class="border p-2 rounded">
+                <input type="text" name="longitud" placeholder="Longitud (ej: -64.5981)" class="border p-2 rounded md:col-span-2">
                 <button type="submit" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 rounded md:col-span-3">Guardar Instituto</button>
             </form>
         </div>
@@ -46,6 +56,8 @@
                         <th class="p-3">Dirección</th>
                         <th class="p-3">Teléfono</th>
                         <th class="p-3">Email de Contacto</th>
+                        <th class="p-3">Latitud</th>
+                        <th class="p-3">Longitud</th>
                         <th class="p-3 text-center">Acciones</th>
                     </tr>
                 </thead>
@@ -58,6 +70,8 @@
                         <td class="p-2"><input type="text" name="direccion" value="{{ i.direccion or '' }}" form="form-edit-{{ i.id }}" class="border p-1 rounded w-32"></td>
                         <td class="p-2"><input type="text" name="telefono" value="{{ i.telefono or '' }}" form="form-edit-{{ i.id }}" class="border p-1 rounded w-24"></td>
                         <td class="p-2"><input type="email" name="email" value="{{ i.email }}" form="form-edit-{{ i.id }}" class="border p-1 rounded w-56 font-semibold"></td>
+                        <td class="p-2"><input type="text" name="latitud" value="{{ i.latitud if i.latitud is not none else '' }}" form="form-edit-{{ i.id }}" class="border p-1 rounded w-24" placeholder="-24.78"></td>
+                        <td class="p-2"><input type="text" name="longitud" value="{{ i.longitud if i.longitud is not none else '' }}" form="form-edit-{{ i.id }}" class="border p-1 rounded w-24" placeholder="-64.59"></td>
                         <td class="p-2 text-center whitespace-nowrap">
                             <form id="form-edit-{{ i.id }}" action="/admin/instituciones/editar/{{ i.id }}" method="POST" style="display:inline"></form>
                             <button type="submit" form="form-edit-{{ i.id }}" class="bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded shadow-sm">Guardar</button>
@@ -67,7 +81,7 @@
                         </td>
                     </tr>
                     {% else %}
-                    <tr><td colspan="7" class="p-4 text-center text-slate-400 italic">No hay institutos registrados todavía. Cargá el primero arriba.</td></tr>
+                    <tr><td colspan="9" class="p-4 text-center text-slate-400 italic">No hay institutos registrados todavía. Cargá el primero arriba.</td></tr>
                     {% endfor %}
                 </tbody>
             </table>

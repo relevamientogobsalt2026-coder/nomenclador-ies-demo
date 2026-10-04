@@ -6,12 +6,15 @@
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-slate-50 text-slate-800 min-h-screen">
-    <header class="bg-indigo-900 text-white p-4 shadow-lg flex justify-between items-center">
+    <header class="bg-indigo-900 text-white p-4 shadow-lg flex flex-col md:flex-row md:justify-between md:items-center gap-3">
         <div>
             <h1 class="text-xl font-bold">Relevamiento Jurisdiccional Docente</h1>
             <p class="text-xs text-indigo-200">Dirección General de Educación Superior - Provincia de Salta</p>
         </div>
-        <a href="/admin" class="text-xs bg-indigo-700 hover:bg-indigo-600 px-3 py-2 rounded font-semibold">Acceso Admin</a>
+        <div class="flex gap-2">
+            <a href="/mapa" class="text-xs bg-teal-600 hover:bg-teal-500 px-3 py-2 rounded font-semibold whitespace-nowrap">🗺️ Ver Mapa de Institutos</a>
+            <a href="/admin" class="text-xs bg-indigo-700 hover:bg-indigo-600 px-3 py-2 rounded font-semibold whitespace-nowrap">Acceso Admin</a>
+        </div>
     </header>
 
     <main class="max-w-4xl mx-auto my-8 bg-white p-8 rounded-xl shadow-md border border-slate-200">

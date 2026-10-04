@@ -266,7 +266,11 @@ def init_db():
     # 5. Domicilio del docente postulante
     sql_postulaciones_domicilio = "ALTER TABLE postulaciones_docentes ADD COLUMN IF NOT EXISTS domicilio VARCHAR(255);"
 
-    queries = [sql_institutos, sql_materias, sql_postulaciones_obs, sql_postulaciones_est, sql_materias_vigente, sql_postulaciones_domicilio]
+    # 6. Coordenadas del instituto, para el mapa público
+    sql_institutos_lat = "ALTER TABLE institutos ADD COLUMN IF NOT EXISTS latitud DOUBLE PRECISION;"
+    sql_institutos_lon = "ALTER TABLE institutos ADD COLUMN IF NOT EXISTS longitud DOUBLE PRECISION;"
+
+    queries = [sql_institutos, sql_materias, sql_postulaciones_obs, sql_postulaciones_est, sql_materias_vigente, sql_postulaciones_domicilio, sql_institutos_lat, sql_institutos_lon]
     
     for query in queries:
         try:
@@ -442,13 +446,17 @@ def admin_instituciones():
 @app.route('/admin/instituciones/nueva', methods=['POST'])
 def nueva_institucion():
     try:
+        lat = request.form.get('latitud')
+        lon = request.form.get('longitud')
         data = {
             "numero_ies": request.form.get('numero_ies'),
             "nombre": request.form.get('nombre'),
             "localidad": request.form.get('localidad'),
             "direccion": request.form.get('direccion'),
             "email": request.form.get('email'),
-            "telefono": request.form.get('telefono')
+            "telefono": request.form.get('telefono'),
+            "latitud": float(lat) if lat else None,
+            "longitud": float(lon) if lon else None
         }
         supabase.table('institutos').insert(data).execute()
         return redirect(url_for('admin_instituciones'))
@@ -458,4 +466,138 @@ def nueva_institucion():
 @app.route('/admin/instituciones/editar/<int:id>', methods=['POST'])
 def editar_institucion(id):
     try:
+        lat = request.form.get('latitud')
+        lon = request.form.get('longitud')
         supabase.table('institutos').update({
+            "numero_ies": request.form.get('numero_ies'),
+            "nombre": request.form.get('nombre'),
+            "localidad": request.form.get('localidad'),
+            "direccion": request.form.get('direccion'),
+            "email": request.form.get('email'),
+            "telefono": request.form.get('telefono'),
+            "latitud": float(lat) if lat else None,
+            "longitud": float(lon) if lon else None
+        }).eq('id', id).execute()
+        return redirect(url_for('admin_instituciones'))
+    except Exception as e:
+        return f"Error al actualizar el instituto: {e}", 500
+
+@app.route('/admin/instituciones/borrar/<int:id>', methods=['POST'])
+def borrar_institucion(id):
+    try:
+        supabase.table('institutos').delete().eq('id', id).execute()
+        return redirect(url_for('admin_instituciones'))
+    except Exception as e:
+        return f"Error al borrar el instituto: {e}", 500
+
+# --- MAPA PÚBLICO DE INSTITUTOS ---
+@app.route('/mapa')
+def mapa_institutos():
+    if not supabase:
+        return "Supabase no configurado."
+    institutos = supabase.table('institutos').select('*').execute().data
+    return render_template('mapa.html', institutos=institutos)
+
+# --- LISTADO DE CARRERAS Y RESOLUCIONES VINCULARES (ADMIN) ---
+# Antes leía de una planilla Excel aparte ("institutos_carreras"), desconectada de todo.
+# Ahora se arma directo desde el Nomenclador (materias_nomenclador + institutos), así que
+# cualquier instituto o materia que cargues en las otras pantallas aparece acá automáticamente.
+@app.route('/admin/institutos')
+def admin_institutos():
+    if not supabase:
+        return "Supabase no configurado."
+    datos = supabase.table('materias_nomenclador').select('*, institutos(*)').order('id', desc=True).execute().data
+    return render_template('admin_institutos.html', materias=datos)
+
+@app.route('/admin/institutos/editar/<int:id>', methods=['POST'])
+def editar_instituto(id):
+    try:
+        supabase.table('materias_nomenclador').update({
+            "carrera": request.form.get('carrera'),
+            "resolucion": request.form.get('resolucion'),
+            "codigo": request.form.get('codigo'),
+            "nombre_unidad_curricular": request.form.get('nombre_unidad_curricular'),
+            "regimen": request.form.get('regimen'),
+            "vigente": request.form.get('vigente')
+        }).eq('id', id).execute()
+        return redirect(url_for('admin_institutos'))
+    except Exception as e:
+        return f"Error al actualizar: {e}", 500
+
+@app.route('/admin/institutos/borrar/<int:id>', methods=['POST'])
+def borrar_materia(id):
+    try:
+        supabase.table('materias_nomenclador').delete().eq('id', id).execute()
+        return redirect(url_for('admin_institutos'))
+    except Exception as e:
+        return f"Error al borrar: {e}", 500
+
+# --- SEGUIMIENTO DE INSCRIPCIONES DOCENTES (ADMIN) ---
+@app.route('/admin/seguimiento')
+def admin_seguimiento():
+    if not supabase:
+        return "Supabase no configurado."
+    postulaciones = supabase.table('postulaciones_docentes').select('*').execute().data
+    return render_template('admin_seguimiento.html', postulaciones=postulaciones)
+
+@app.route('/admin/postulacion/editar/<int:id>', methods=['POST'])
+def editar_postulacion(id):
+    try:
+        supabase.table('postulaciones_docentes').update({
+            "estado_inscripcion": request.form.get('estado_inscripcion'),
+            "observaciones": request.form.get('observaciones')
+        }).eq('id', id).execute()
+        return redirect(url_for('admin_seguimiento'))
+    except Exception as e:
+        return f"Error al actualizar postulación: {e}", 500
+
+@app.route('/admin/postulacion/borrar/<int:id>', methods=['POST'])
+def borrar_postulacion(id):
+    try:
+        supabase.table('postulaciones_docentes').delete().eq('id', id).execute()
+        return redirect(url_for('admin_seguimiento'))
+    except Exception as e:
+        return f"Error al borrar postulación: {e}", 500
+
+# --- COMPROBANTE DE INSCRIPCIÓN (PDF DESCARGABLE) ---
+@app.route('/comprobante/<int:postulante_id>')
+def comprobante_pdf(postulante_id):
+    if not supabase:
+        return "Supabase no configurado.", 500
+
+    response = supabase.table('postulaciones_docentes').select('*').eq('id', postulante_id).execute()
+    if not response.data:
+        abort(404)
+    docente = response.data[0]
+
+    historial = supabase.table('historial_relevamiento') \
+        .select('materia_id, materias_nomenclador(*, institutos(*))') \
+        .eq('postulante_id', postulante_id).execute()
+    materias_habilitadas = [item['materias_nomenclador'] for item in historial.data if item.get('materias_nomenclador')]
+
+    buffer = generar_comprobante_pdf(docente, materias_habilitadas)
+    nombre_archivo = f"comprobante_inscripcion_{docente.get('dni') or postulante_id}.pdf"
+    return send_file(buffer, mimetype='application/pdf', as_attachment=True, download_name=nombre_archivo)
+
+# --- NUEVA RUTA: DETALLE INDIVIDUAL DEL POSTULANTE ---
+@app.route('/postulante/<int:docente_id>')
+def detalle_postulante(docente_id):
+    if not supabase:
+        return "Supabase no configurado.", 500
+    
+    # Busca los datos principales del postulante
+    response = supabase.table('postulaciones_docentes').select('*').eq('id', docente_id).execute()
+    
+    if not response.data:
+        abort(404)
+        
+    docente = response.data[0]
+
+    # Opcional: Buscar también las materias habilitadas en el historial para mostrarlas en la ficha
+    historial = supabase.table('historial_relevamiento').select('materia_id, materias_nomenclador(nombre_unidad_curricular)').eq('postulante_id', docente_id).execute()
+    docente['materias_habilitadas'] = [item['materias_nomenclador'] for item in historial.data if item.get('materias_nomenclador')]
+    
+    return render_template('detalle_postulante.html', docente=docente)
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=10000)
