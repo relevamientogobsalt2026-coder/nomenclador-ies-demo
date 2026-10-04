@@ -307,12 +307,19 @@ def postular():
     experiencia = request.form.get('experiencia')
     capacitacion = request.form.get('capacitacion')
 
-    # Subir documentación adjunta a Supabase Storage
-    dni_lado_a_url = subir_archivo(request.files.get('dni_a'), 'dni')
-    dni_lado_b_url = subir_archivo(request.files.get('dni_b'), 'dni')
-    titulo_1_lado_a_url = subir_archivo(request.files.get('titulo_a'), 'titulos')
-    titulo_1_lado_b_url = subir_archivo(request.files.get('titulo_b'), 'titulos')
-    cv_nominal_pdf_url = subir_archivo(request.files.get('cv_pdf'), 'cv')
+    # Buscar si ya existe una postulación previa con este DNI, para actualizarla
+    # en lugar de crear un registro duplicado.
+    existente = supabase.table('postulaciones_docentes').select('*').eq('dni', dni).execute()
+    postulacion_previa = existente.data[0] if existente.data else None
+
+    # Subir documentación adjunta a Supabase Storage.
+    # Si el docente no vuelve a adjuntar un archivo al actualizar sus datos,
+    # se conserva la URL que ya tenía cargada (no se borra lo anterior).
+    dni_lado_a_url = subir_archivo(request.files.get('dni_a'), 'dni') or (postulacion_previa.get('dni_lado_a_url') if postulacion_previa else None)
+    dni_lado_b_url = subir_archivo(request.files.get('dni_b'), 'dni') or (postulacion_previa.get('dni_lado_b_url') if postulacion_previa else None)
+    titulo_1_lado_a_url = subir_archivo(request.files.get('titulo_a'), 'titulos') or (postulacion_previa.get('titulo_1_lado_a_url') if postulacion_previa else None)
+    titulo_1_lado_b_url = subir_archivo(request.files.get('titulo_b'), 'titulos') or (postulacion_previa.get('titulo_1_lado_b_url') if postulacion_previa else None)
+    cv_nominal_pdf_url = subir_archivo(request.files.get('cv_pdf'), 'cv') or (postulacion_previa.get('cv_nominal_pdf_url') if postulacion_previa else None)
 
     post_data = {
         "nombre_apellido": nombre,
@@ -333,9 +340,18 @@ def postular():
         "titulo_1_lado_b_url": titulo_1_lado_b_url,
         "cv_nominal_pdf_url": cv_nominal_pdf_url
     }
-    
-    inserted = supabase.table('postulaciones_docentes').insert(post_data).execute()
-    postulante_id = inserted.data[0]['id']
+
+    if postulacion_previa:
+        # Ya existía una postulación con este DNI: actualizamos ese mismo
+        # registro en vez de crear uno nuevo.
+        postulante_id = postulacion_previa['id']
+        supabase.table('postulaciones_docentes').update(post_data).eq('id', postulante_id).execute()
+        # Limpiamos el historial de materias habilitadas anterior: se recalcula
+        # de nuevo más abajo en base a los títulos actualizados.
+        supabase.table('historial_relevamiento').delete().eq('postulante_id', postulante_id).execute()
+    else:
+        inserted = supabase.table('postulaciones_docentes').insert(post_data).execute()
+        postulante_id = inserted.data[0]['id']
 
     titulos_docente = [normalizar(t) for t in [titulo_1, titulo_2] if t]
     all_materias = supabase.table('materias_nomenclador').select('*, institutos(*)').execute().data
@@ -443,76 +459,3 @@ def nueva_institucion():
 def editar_institucion(id):
     try:
         supabase.table('institutos').update({
-            "numero_ies": request.form.get('numero_ies'),
-            "nombre": request.form.get('nombre'),
-            "localidad": request.form.get('localidad'),
-            "direccion": request.form.get('direccion'),
-            "email": request.form.get('email'),
-            "telefono": request.form.get('telefono')
-        }).eq('id', id).execute()
-        return redirect(url_for('admin_instituciones'))
-    except Exception as e:
-        return f"Error al actualizar el instituto: {e}", 500
-
-@app.route('/admin/instituciones/borrar/<int:id>', methods=['POST'])
-def borrar_institucion(id):
-    try:
-        supabase.table('institutos').delete().eq('id', id).execute()
-        return redirect(url_for('admin_instituciones'))
-    except Exception as e:
-        return f"Error al borrar el instituto: {e}", 500
-
-# --- LISTADO DE CARRERAS Y RESOLUCIONES VINCULARES (ADMIN) ---
-# Antes leía de una planilla Excel aparte ("institutos_carreras"), desconectada de todo.
-# Ahora se arma directo desde el Nomenclador (materias_nomenclador + institutos), así que
-# cualquier instituto o materia que cargues en las otras pantallas aparece acá automáticamente.
-@app.route('/admin/institutos')
-def admin_institutos():
-    if not supabase:
-        return "Supabase no configurado."
-    datos = supabase.table('materias_nomenclador').select('*, institutos(*)').order('id', desc=True).execute().data
-    return render_template('admin_institutos.html', materias=datos)
-
-@app.route('/admin/institutos/editar/<int:id>', methods=['POST'])
-def editar_instituto(id):
-    try:
-        supabase.table('materias_nomenclador').update({
-            "carrera": request.form.get('carrera'),
-            "resolucion": request.form.get('resolucion'),
-            "codigo": request.form.get('codigo'),
-            "nombre_unidad_curricular": request.form.get('nombre_unidad_curricular'),
-            "regimen": request.form.get('regimen'),
-            "vigente": request.form.get('vigente')
-        }).eq('id', id).execute()
-        return redirect(url_for('admin_institutos'))
-    except Exception as e:
-        return f"Error al actualizar: {e}", 500
-
-@app.route('/admin/institutos/borrar/<int:id>', methods=['POST'])
-def borrar_materia(id):
-    try:
-        supabase.table('materias_nomenclador').delete().eq('id', id).execute()
-        return redirect(url_for('admin_institutos'))
-    except Exception as e:
-        return f"Error al borrar: {e}", 500
-
-# --- SEGUIMIENTO DE INSCRIPCIONES DOCENTES (ADMIN) ---
-@app.route('/admin/seguimiento')
-def admin_seguimiento():
-    if not supabase:
-        return "Supabase no configurado."
-    postulaciones = supabase.table('postulaciones_docentes').select('*').execute().data
-    return render_template('admin_seguimiento.html', postulaciones=postulaciones)
-
-@app.route('/admin/postulacion/editar/<int:id>', methods=['POST'])
-def editar_postulacion(id):
-    try:
-        supabase.table('postulaciones_docentes').update({
-            "estado_inscripcion": request.form.get('estado_inscripcion'),
-            "observaciones": request.form.get('observaciones')
-        }).eq('id', id).execute()
-        return redirect(url_for('admin_seguimiento'))
-    except Exception as e:
-        return f"Error al actualizar postulación: {e}", 500
-
-@app.route('/admin/postulacion/borrar/<
