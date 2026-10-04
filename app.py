@@ -308,7 +308,7 @@ def init_db():
     """Ejecuta las consultas SQL de inicialización y actualización de tablas en Supabase"""
     if not supabase:
         return
-    
+
     # 1. Actualizar tabla de institutos (si hace falta)
     sql_institutos = """
     CREATE TABLE IF NOT EXISTS institutos (
@@ -321,7 +321,7 @@ def init_db():
         telefono VARCHAR(50)
     );
     """
-    
+
     # 2. Asegurar que materias_nomenclador vincule la resolución de la carrera
     sql_materias = """
     CREATE TABLE IF NOT EXISTS materias_nomenclador (
@@ -337,7 +337,7 @@ def init_db():
         titulos_habilitantes TEXT[]
     );
     """
-    
+
     # 3. Crear o verificar tabla de postulaciones con campos de control administrativo
     sql_postulaciones_obs = "ALTER TABLE postulaciones_docentes ADD COLUMN IF NOT EXISTS observaciones TEXT DEFAULT '';"
     sql_postulaciones_est = "ALTER TABLE postulaciones_docentes ADD COLUMN IF NOT EXISTS estado_inscripcion VARCHAR(50) DEFAULT 'PENDIENTE';"
@@ -353,7 +353,7 @@ def init_db():
     sql_institutos_lon = "ALTER TABLE institutos ADD COLUMN IF NOT EXISTS longitud DOUBLE PRECISION;"
 
     queries = [sql_institutos, sql_materias, sql_postulaciones_obs, sql_postulaciones_est, sql_materias_vigente, sql_postulaciones_domicilio, sql_institutos_lat, sql_institutos_lon]
-    
+
     for query in queries:
         try:
             if hasattr(supabase, 'rpc'):
@@ -384,12 +384,12 @@ def postular():
     email = request.form.get('email')
     domicilio = request.form.get('domicilio')
     localidades = request.form.getlist('localidades')
-    
+
     titulo_1 = request.form.get('titulo_base_1')
     egreso_1 = request.form.get('anio_egreso_1')
     titulo_2 = request.form.get('titulo_base_2')
     egreso_2 = request.form.get('anio_egreso_2')
-    
+
     experiencia = request.form.get('experiencia')
     capacitacion = request.form.get('capacitacion')
 
@@ -441,13 +441,13 @@ def postular():
 
     titulos_docente = [normalizar(t) for t in [titulo_1, titulo_2] if t]
     all_materias = supabase.table('materias_nomenclador').select('*, institutos(*)').execute().data
-    
+
     materias_habilitadas = []
-    
+
     for mat in all_materias:
         habilitantes = [normalizar(h) for h in mat.get('titulos_habilitantes', [])]
         es_hab = any(any(t in hab or hab in t for hab in habilitantes) for t in titulos_docente)
-        
+
         if es_hab:
             materias_habilitadas.append(mat)
             supabase.table('historial_relevamiento').insert({
@@ -487,11 +487,11 @@ def postular():
 def admin():
     if not supabase:
         return "Supabase no está configurado."
-    
+
     materias = supabase.table('materias_nomenclador').select('*, institutos(*)').execute().data
     postulaciones = supabase.table('postulaciones_docentes').select('*').execute().data
     institutos = supabase.table('institutos').select('*').order('nombre').execute().data
-    
+
     return render_template('admin.html', materias=materias, postulaciones=postulaciones, institutos=institutos)
 
 # 4. GUARDAR NUEVA MATERIA EN NOMENCLADOR (ADMIN)
@@ -679,6 +679,9 @@ def editar_postulacion(id):
 @app.route('/admin/postulacion/borrar/<int:id>', methods=['POST'])
 def borrar_postulacion(id):
     try:
+        # Primero se borran las filas de historial_relevamiento que apuntan a este
+        # postulante (si no, Postgres rechaza el borrado por la llave foránea).
+        supabase.table('historial_relevamiento').delete().eq('postulante_id', id).execute()
         supabase.table('postulaciones_docentes').delete().eq('id', id).execute()
         return redirect(url_for('admin_seguimiento'))
     except Exception as e:
@@ -735,19 +738,19 @@ def comprobante_pdf(postulante_id):
 def detalle_postulante(docente_id):
     if not supabase:
         return "Supabase no configurado.", 500
-    
+
     # Busca los datos principales del postulante
     response = supabase.table('postulaciones_docentes').select('*').eq('id', docente_id).execute()
-    
+
     if not response.data:
         abort(404)
-        
+
     docente = response.data[0]
 
     # Opcional: Buscar también las materias habilitadas en el historial para mostrarlas en la ficha
     historial = supabase.table('historial_relevamiento').select('materia_id, materias_nomenclador(nombre_unidad_curricular)').eq('postulante_id', docente_id).execute()
     docente['materias_habilitadas'] = [item['materias_nomenclador'] for item in historial.data if item.get('materias_nomenclador')]
-    
+
     return render_template('detalle_postulante.html', docente=docente)
 
 if __name__ == '__main__':
