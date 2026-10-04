@@ -352,7 +352,10 @@ def init_db():
     sql_institutos_lat = "ALTER TABLE institutos ADD COLUMN IF NOT EXISTS latitud DOUBLE PRECISION;"
     sql_institutos_lon = "ALTER TABLE institutos ADD COLUMN IF NOT EXISTS longitud DOUBLE PRECISION;"
 
-    queries = [sql_institutos, sql_materias, sql_postulaciones_obs, sql_postulaciones_est, sql_materias_vigente, sql_postulaciones_domicilio, sql_institutos_lat, sql_institutos_lon]
+    # 7. Campo libre para respuestas de campos personalizados del formulario
+    sql_postulaciones_extra = "ALTER TABLE postulaciones_docentes ADD COLUMN IF NOT EXISTS campos_extra JSONB DEFAULT '{}'::jsonb;"
+
+    queries = [sql_institutos, sql_materias, sql_postulaciones_obs, sql_postulaciones_est, sql_materias_vigente, sql_postulaciones_domicilio, sql_institutos_lat, sql_institutos_lon, sql_postulaciones_extra]
 
     for query in queries:
         try:
@@ -369,7 +372,13 @@ init_db()
 def index():
     materias_res = supabase.table('materias_nomenclador').select('*').execute() if supabase else None
     materias = materias_res.data if materias_res else []
-    return render_template('index.html', materias=materias)
+
+    campos_res = supabase.table('campos_formulario').select('*').order('orden').execute() if supabase else None
+    campos_formulario = campos_res.data if campos_res else []
+    config = {c['clave']: c for c in campos_formulario}
+    campos_personalizados = [c for c in campos_formulario if c.get('es_personalizado') and c.get('habilitado')]
+
+    return render_template('index.html', materias=materias, config=config, campos_personalizados=campos_personalizados)
 
 # 2. PROCESAR INSCRIPCIÓN Y VALIDAR CONTRA NOMENCLADOR
 @app.route('/postular', methods=['POST'])
@@ -407,6 +416,18 @@ def postular():
     titulo_1_lado_b_url = subir_archivo(request.files.get('titulo_b'), 'titulos') or (postulacion_previa.get('titulo_1_lado_b_url') if postulacion_previa else None)
     cv_nominal_pdf_url = subir_archivo(request.files.get('cv_pdf'), 'cv') or (postulacion_previa.get('cv_nominal_pdf_url') if postulacion_previa else None)
 
+    # Leer las respuestas de los campos personalizados que estén habilitados
+    # en ese momento, y guardarlas todas juntas en la columna campos_extra.
+    campos_config = supabase.table('campos_formulario').select('*').execute().data
+    campos_personalizados = [c for c in campos_config if c.get('es_personalizado') and c.get('habilitado')]
+    campos_extra = {}
+    for campo in campos_personalizados:
+        clave = campo['clave']
+        if campo.get('tipo') == 'opciones':
+            campos_extra[clave] = request.form.getlist(f'extra_{clave}')
+        else:
+            campos_extra[clave] = request.form.get(f'extra_{clave}', '')
+
     post_data = {
         "nombre_apellido": nombre,
         "dni": dni,
@@ -424,7 +445,8 @@ def postular():
         "dni_lado_b_url": dni_lado_b_url,
         "titulo_1_lado_a_url": titulo_1_lado_a_url,
         "titulo_1_lado_b_url": titulo_1_lado_b_url,
-        "cv_nominal_pdf_url": cv_nominal_pdf_url
+        "cv_nominal_pdf_url": cv_nominal_pdf_url,
+        "campos_extra": campos_extra
     }
 
     if postulacion_previa:
@@ -656,6 +678,78 @@ def exportar_planilla(formato):
         return send_file(buffer, mimetype='application/pdf', as_attachment=True, download_name='planilla_carreras_salta.pdf')
     else:
         abort(404)
+
+# --- CONFIGURACIÓN DINÁMICA DEL FORMULARIO PÚBLICO (ADMIN) ---
+@app.route('/admin/formulario')
+def admin_formulario():
+    if not supabase:
+        return "Supabase no configurado."
+    campos = supabase.table('campos_formulario').select('*').order('orden').execute().data
+    return render_template('admin_formulario.html', campos=campos)
+
+@app.route('/admin/formulario/actualizar/<int:id>', methods=['POST'])
+def actualizar_campo_formulario(id):
+    try:
+        data = {"obligatorio": request.form.get('obligatorio') == 'on'}
+        # El "habilitado" solo se edita para los campos personalizados (los fijos
+        # siempre están visibles); la plantilla manda esta bandera para saber si
+        # tiene que tocar esa columna o dejarla como está.
+        if request.form.get('tiene_habilitado') == '1':
+            data["habilitado"] = request.form.get('habilitado') == 'on'
+        supabase.table('campos_formulario').update(data).eq('id', id).execute()
+        return redirect(url_for('admin_formulario'))
+    except Exception as e:
+        return f"Error al actualizar el campo: {e}", 500
+
+@app.route('/admin/formulario/nuevo', methods=['POST'])
+def nuevo_campo_formulario():
+    try:
+        etiqueta = (request.form.get('etiqueta') or '').strip()
+        tipo = request.form.get('tipo', 'texto')
+        opciones = (request.form.get('opciones') or '').strip()
+        obligatorio = request.form.get('obligatorio') == 'on'
+
+        if not etiqueta:
+            return "El campo nuevo necesita un nombre/etiqueta.", 400
+        if tipo not in ('texto', 'opciones'):
+            tipo = 'texto'
+
+        # Generar una clave interna única a partir de la etiqueta (sin espacios ni tildes)
+        clave_base = normalizar(etiqueta).replace(' ', '_')
+        clave_base = ''.join(c for c in clave_base if c.isalnum() or c == '_') or 'campo'
+        clave = clave_base
+        sufijo = 1
+        while supabase.table('campos_formulario').select('id').eq('clave', clave).execute().data:
+            sufijo += 1
+            clave = f"{clave_base}_{sufijo}"
+
+        max_orden_res = supabase.table('campos_formulario').select('orden').order('orden', desc=True).limit(1).execute().data
+        siguiente_orden = (max_orden_res[0]['orden'] + 1) if max_orden_res else 1
+
+        supabase.table('campos_formulario').insert({
+            "clave": clave,
+            "etiqueta": etiqueta,
+            "tipo": tipo,
+            "obligatorio": obligatorio,
+            "habilitado": True,
+            "opciones": opciones if tipo == 'opciones' else None,
+            "orden": siguiente_orden,
+            "es_personalizado": True
+        }).execute()
+        return redirect(url_for('admin_formulario'))
+    except Exception as e:
+        return f"Error al crear el campo: {e}", 500
+
+@app.route('/admin/formulario/borrar/<int:id>', methods=['POST'])
+def borrar_campo_formulario(id):
+    try:
+        campo = supabase.table('campos_formulario').select('*').eq('id', id).execute().data
+        if campo and not campo[0].get('es_personalizado'):
+            return "No se pueden borrar los campos fijos del sistema, solo deshabilitarlos no aplica a estos.", 400
+        supabase.table('campos_formulario').delete().eq('id', id).execute()
+        return redirect(url_for('admin_formulario'))
+    except Exception as e:
+        return f"Error al borrar el campo: {e}", 500
 
 # --- SEGUIMIENTO DE INSCRIPCIONES DOCENTES (ADMIN) ---
 @app.route('/admin/seguimiento')

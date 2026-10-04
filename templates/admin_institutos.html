@@ -13,6 +13,7 @@
                 <a href="/admin" class="bg-indigo-700 hover:bg-indigo-600 px-3 py-1.5 rounded text-xs font-semibold whitespace-nowrap">Nomenclador de Materias</a>
                 <a href="/admin/instituciones" class="bg-purple-600 hover:bg-purple-700 px-3 py-1.5 rounded text-xs font-semibold whitespace-nowrap">🏫 Institutos y Emails</a>
                 <a href="/admin/seguimiento" class="bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 rounded text-xs font-semibold whitespace-nowrap">📊 Seguimiento Docente</a>
+                <a href="/admin/formulario" class="bg-sky-600 hover:bg-sky-700 px-3 py-1.5 rounded text-xs font-semibold whitespace-nowrap">⚙️ Configurar Formulario</a>
                 <a href="/" class="bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded text-xs whitespace-nowrap">🌐 Ir al Sitio</a>
             </div>
         </div>
@@ -32,7 +33,7 @@
                 <a href="/admin/institutos/exportar/pdf" class="bg-red-700 hover:bg-red-800 text-white px-3 py-2 rounded-lg text-xs font-semibold whitespace-nowrap">📄 PDF</a>
             </div>
         </div>
-        
+
         <div class="overflow-x-auto">
             <table id="tablaPlanilla" class="w-full text-left border-collapse text-xs">
                 <thead>
@@ -95,7 +96,7 @@
         function normalizarTexto(str) {
             return (str || '')
                 .normalize('NFD')
-                .replace(/[\u0300-\u036f]/g, '')
+                .replace(/[̀-ͯ]/g, '')
                 .toLowerCase();
         }
 

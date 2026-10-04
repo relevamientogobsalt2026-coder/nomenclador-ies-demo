@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Configurar Formulario - Admin</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-100 text-slate-800 min-h-screen">
+    <header class="bg-sky-900 text-white p-4 shadow">
+        <div class="max-w-6xl mx-auto flex flex-col md:flex-row md:justify-between md:items-center gap-3">
+            <h1 class="text-lg font-bold">⚙️ Configurar Formulario de Postulación</h1>
+            <div class="flex flex-wrap gap-2">
+                <a href="/admin" class="bg-sky-700 hover:bg-sky-600 px-3 py-1.5 rounded text-xs font-semibold whitespace-nowrap">Nomenclador y Materias</a>
+                <a href="/admin/instituciones" class="bg-purple-600 hover:bg-purple-700 px-3 py-1.5 rounded text-xs font-semibold whitespace-nowrap">🏫 Institutos y Emails</a>
+                <a href="/admin/institutos" class="bg-amber-600 hover:bg-amber-700 px-3 py-1.5 rounded text-xs font-semibold whitespace-nowrap">📋 Planilla IES y Carreras</a>
+                <a href="/admin/seguimiento" class="bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 rounded text-xs font-semibold whitespace-nowrap">📊 Seguimiento</a>
+                <a href="/" class="bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded text-xs whitespace-nowrap">🌐 Ir al Sitio</a>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-6xl mx-auto my-6 p-6 bg-white rounded-xl shadow border">
+        <p class="text-xs text-slate-500 mb-4">
+            Acá controlás qué datos pide el formulario público (<a href="/" class="text-sky-600 underline">el que completan los docentes</a>),
+            sin tocar código. Marcá cada campo como obligatorio u opcional, y agregá campos nuevos si hace falta pedir algo más.
+        </p>
+
+        <h2 class="text-lg font-bold text-sky-900 mb-3">Campos del Formulario</h2>
+        <div class="overflow-x-auto mb-8">
+            <table class="w-full text-left border-collapse text-xs">
+                <thead>
+                    <tr class="bg-sky-50 text-sky-900 border-b">
+                        <th class="p-2">Campo</th>
+                        <th class="p-2">Tipo</th>
+                        <th class="p-2">Obligatorio</th>
+                        <th class="p-2">Habilitado</th>
+                        <th class="p-2 text-center">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y">
+                    {% for campo in campos %}
+                    <tr class="hover:bg-slate-50">
+                        <td class="p-2 font-semibold">
+                            {{ campo.etiqueta }}
+                            {% if campo.es_personalizado %}<span class="text-sky-600 text-[10px] font-normal">(personalizado)</span>{% endif %}
+                        </td>
+                        <td class="p-2 text-slate-500">
+                            {% if campo.tipo == 'fijo' %}Fijo del sistema{% elif campo.tipo == 'opciones' %}Con opciones ({{ campo.opciones }}){% else %}Texto libre{% endif %}
+                        </td>
+                        <td class="p-2">
+                            <form id="form-campo-{{ campo.id }}" action="/admin/formulario/actualizar/{{ campo.id }}" method="POST" class="flex items-center gap-2">
+                                <input type="hidden" name="tiene_habilitado" value="{{ '1' if campo.es_personalizado else '0' }}">
+                                <label class="inline-flex items-center gap-1 cursor-pointer select-none">
+                                    <input type="checkbox" name="obligatorio" {% if campo.obligatorio %}checked{% endif %} class="h-4 w-4 text-sky-600 rounded">
+                                    <span>{{ 'Obligatorio' if campo.obligatorio else 'Opcional' }}</span>
+                                </label>
+                            </form>
+                        </td>
+                        <td class="p-2">
+                            {% if campo.es_personalizado %}
+                            <label class="inline-flex items-center gap-1 cursor-pointer select-none" form="form-campo-{{ campo.id }}">
+                                <input type="checkbox" name="habilitado" form="form-campo-{{ campo.id }}" {% if campo.habilitado %}checked{% endif %} class="h-4 w-4 text-sky-600 rounded">
+                                <span>{{ 'Habilitado' if campo.habilitado else 'Deshabilitado' }}</span>
+                            </label>
+                            {% else %}
+                            <span class="text-slate-400 italic">Siempre visible</span>
+                            {% endif %}
+                        </td>
+                        <td class="p-2 text-center whitespace-nowrap">
+                            <button type="submit" form="form-campo-{{ campo.id }}" class="bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded font-semibold">Guardar</button>
+                            {% if campo.es_personalizado %}
+                            <form action="/admin/formulario/borrar/{{ campo.id }}" method="POST" class="inline" onsubmit="return confirm('¿Eliminar este campo del formulario? Las respuestas ya guardadas no se borran.');">
+                                <button type="submit" class="bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded font-semibold">Borrar</button>
+                            </form>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="5" class="p-4 text-center text-slate-400 italic">Todavía no ejecutaste el SQL de configuración en Supabase. Una vez que lo corras, los campos van a aparecer acá.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <h2 class="text-lg font-bold text-sky-900 mb-3">+ Agregar Campo Nuevo</h2>
+        <form action="/admin/formulario/nuevo" method="POST" class="grid grid-cols-1 md:grid-cols-4 gap-3 text-xs bg-slate-50 p-4 rounded-lg border">
+            <input type="text" name="etiqueta" placeholder="Nombre del campo (Ej: Número de Legajo)" required class="border p-2 rounded md:col-span-2">
+            <select name="tipo" id="tipoCampoNuevo" onchange="document.getElementById('opcionesWrap').classList.toggle('hidden', this.value !== 'opciones')" class="border p-2 rounded">
+                <option value="texto">Texto libre</option>
+                <option value="opciones">Con opciones (casillas)</option>
+            </select>
+            <label class="inline-flex items-center gap-2 cursor-pointer select-none border rounded p-2 bg-white">
+                <input type="checkbox" name="obligatorio" class="h-4 w-4 text-sky-600 rounded">
+                <span>Obligatorio</span>
+            </label>
+            <div id="opcionesWrap" class="md:col-span-4 hidden">
+                <input type="text" name="opciones" placeholder="Opciones separadas por coma (Ej: Mañana, Tarde, Noche)" class="w-full border p-2 rounded">
+            </div>
+            <button type="submit" class="md:col-span-4 bg-sky-600 hover:bg-sky-700 text-white font-bold py-2 rounded">Agregar Campo</button>
+        </form>
+    </main>
+</body>
+</html>
