@@ -6,11 +6,13 @@ from io import BytesIO
 from datetime import datetime
 from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, abort, send_file
 from supabase import create_client, Client
-from reportlab.lib.pagesizes import A4
+from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib.units import mm
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image as RLImage, Table, TableStyle, HRFlowable
+import openpyxl
+from openpyxl.styles import Font, PatternFill
 
 app = Flask(__name__)
 app.secret_key = "secret_key_ies_6039"
@@ -221,6 +223,86 @@ def armar_mailto(docente, materias_habilitadas, instituto_id=None):
         f"?subject={urllib.parse.quote(asunto)}"
         f"&body={urllib.parse.quote(cuerpo)}"
     )
+
+def generar_excel(headers, filas, nombre_hoja="Datos"):
+    """Genera un archivo .xlsx en memoria a partir de encabezados y filas de datos."""
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = nombre_hoja[:31]  # Excel no permite nombres de hoja de más de 31 caracteres
+
+    ws.append(headers)
+    header_fill = PatternFill(start_color="4C1D95", end_color="4C1D95", fill_type="solid")
+    for cell in ws[1]:
+        cell.font = Font(color="FFFFFF", bold=True)
+        cell.fill = header_fill
+
+    for fila in filas:
+        ws.append(fila)
+
+    for col in ws.columns:
+        valores = [str(c.value) if c.value is not None else '' for c in col]
+        ancho = min(max((len(v) for v in valores), default=10) + 2, 50)
+        ws.column_dimensions[col[0].column_letter].width = ancho
+
+    buffer = BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+    return buffer
+
+def generar_pdf_listado(titulo, headers, filas):
+    """Genera un PDF apaisado con el logo del Ministerio, a partir de encabezados y filas."""
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(
+        buffer, pagesize=landscape(A4),
+        topMargin=15 * mm, bottomMargin=15 * mm, leftMargin=15 * mm, rightMargin=15 * mm
+    )
+    styles = getSampleStyleSheet()
+
+    titulo_style = ParagraphStyle('TituloExport', parent=styles['Title'], fontSize=14,
+                                   textColor=colors.HexColor('#4c1d95'), spaceAfter=2)
+    subtitulo_style = ParagraphStyle('SubtituloExport', parent=styles['Normal'], fontSize=8,
+                                      textColor=colors.HexColor('#64748b'), spaceAfter=10)
+    celda_header_style = ParagraphStyle('CeldaHeaderExport', parent=styles['Normal'], fontSize=7,
+                                         textColor=colors.white, fontName='Helvetica-Bold', leading=9)
+    celda_style = ParagraphStyle('CeldaExport', parent=styles['Normal'], fontSize=7,
+                                  textColor=colors.HexColor('#1e293b'), leading=9)
+
+    story = []
+
+    if os.path.exists(LOGO_PATH):
+        ancho_logo = 50 * mm
+        alto_logo = ancho_logo * (103 / 370)
+        story.append(RLImage(LOGO_PATH, width=ancho_logo, height=alto_logo))
+        story.append(Spacer(1, 8))
+
+    story.append(Paragraph(titulo, titulo_style))
+    story.append(Paragraph(
+        f"Ministerio de Educación y Cultura - Provincia de Salta | Generado el {datetime.now().strftime('%d/%m/%Y %H:%M')}",
+        subtitulo_style
+    ))
+    story.append(HRFlowable(width="100%", color=colors.HexColor('#c7d2fe'), thickness=1))
+    story.append(Spacer(1, 10))
+
+    data = [[Paragraph(str(h), celda_header_style) for h in headers]]
+    for fila in filas:
+        data.append([Paragraph(str(c) if c is not None else '', celda_style) for c in fila])
+
+    tabla = Table(data, repeatRows=1)
+    tabla.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#4c1d95')),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#cbd5e1')),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('TOPPADDING', (0, 0), (-1, -1), 4),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ('LEFTPADDING', (0, 0), (-1, -1), 4),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 4),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f8fafc')]),
+    ]))
+    story.append(tabla)
+
+    doc.build(story)
+    buffer.seek(0)
+    return buffer
 
 def init_db():
     """Ejecuta las consultas SQL de inicialización y actualización de tablas en Supabase"""
@@ -490,6 +572,24 @@ def borrar_institucion(id):
     except Exception as e:
         return f"Error al borrar el instituto: {e}", 500
 
+# --- EXPORTAR RESPALDO: INSTITUTOS Y EMAILS ---
+@app.route('/admin/instituciones/exportar/<formato>')
+def exportar_instituciones(formato):
+    if not supabase:
+        return "Supabase no configurado.", 500
+    institutos = supabase.table('institutos').select('*').order('nombre').execute().data
+    headers = ['N° IES', 'Nombre', 'Localidad', 'Dirección', 'Teléfono', 'Email']
+    filas = [[i.get('numero_ies'), i.get('nombre'), i.get('localidad'), i.get('direccion'), i.get('telefono'), i.get('email')] for i in institutos]
+
+    if formato == 'excel':
+        buffer = generar_excel(headers, filas, "Institutos")
+        return send_file(buffer, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', as_attachment=True, download_name='institutos_salta.xlsx')
+    elif formato == 'pdf':
+        buffer = generar_pdf_listado("Institutos y Emails de Contacto", headers, filas)
+        return send_file(buffer, mimetype='application/pdf', as_attachment=True, download_name='institutos_salta.pdf')
+    else:
+        abort(404)
+
 # --- MAPA PÚBLICO DE INSTITUTOS ---
 @app.route('/mapa')
 def mapa_institutos():
@@ -532,6 +632,31 @@ def borrar_materia(id):
     except Exception as e:
         return f"Error al borrar: {e}", 500
 
+# --- EXPORTAR RESPALDO: PLANILLA DE CARRERAS ---
+@app.route('/admin/institutos/exportar/<formato>')
+def exportar_planilla(formato):
+    if not supabase:
+        return "Supabase no configurado.", 500
+    datos = supabase.table('materias_nomenclador').select('*, institutos(*)').order('id', desc=True).execute().data
+    headers = ['Instituto', 'N°', 'Localidad', 'Carrera', 'Resolución', 'Código', 'Unidad Curricular', 'Régimen', 'Vigente']
+    filas = []
+    for m in datos:
+        inst = m.get('institutos') or {}
+        filas.append([
+            inst.get('nombre', ''), inst.get('numero_ies', ''), inst.get('localidad', ''),
+            m.get('carrera'), m.get('resolucion'), m.get('codigo'), m.get('nombre_unidad_curricular'),
+            m.get('regimen'), m.get('vigente', 'Sí')
+        ])
+
+    if formato == 'excel':
+        buffer = generar_excel(headers, filas, "Planilla")
+        return send_file(buffer, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', as_attachment=True, download_name='planilla_carreras_salta.xlsx')
+    elif formato == 'pdf':
+        buffer = generar_pdf_listado("Planilla de Carreras y Resoluciones Vinculares", headers, filas)
+        return send_file(buffer, mimetype='application/pdf', as_attachment=True, download_name='planilla_carreras_salta.pdf')
+    else:
+        abort(404)
+
 # --- SEGUIMIENTO DE INSCRIPCIONES DOCENTES (ADMIN) ---
 @app.route('/admin/seguimiento')
 def admin_seguimiento():
@@ -558,6 +683,32 @@ def borrar_postulacion(id):
         return redirect(url_for('admin_seguimiento'))
     except Exception as e:
         return f"Error al borrar postulación: {e}", 500
+
+# --- EXPORTAR RESPALDO: SEGUIMIENTO DOCENTE ---
+@app.route('/admin/seguimiento/exportar/<formato>')
+def exportar_seguimiento(formato):
+    if not supabase:
+        return "Supabase no configurado.", 500
+    postulaciones = supabase.table('postulaciones_docentes').select('*').execute().data
+    headers = ['Nombre y Apellido', 'DNI', 'Teléfono', 'Email', 'Domicilio', 'Localidades', 'Título 1', 'Título 2', 'Estado', 'Observaciones']
+    filas = []
+    for p in postulaciones:
+        filas.append([
+            p.get('nombre_apellido'), p.get('dni'), p.get('telefono'), p.get('email'), p.get('domicilio'),
+            ', '.join(p.get('localidades_postulacion') or []),
+            f"{p.get('titulo_base_1') or ''} ({p.get('anio_egreso_1') or ''})",
+            f"{p.get('titulo_base_2') or ''} ({p.get('anio_egreso_2') or ''})" if p.get('titulo_base_2') else '',
+            p.get('estado_inscripcion'), p.get('observaciones')
+        ])
+
+    if formato == 'excel':
+        buffer = generar_excel(headers, filas, "Seguimiento")
+        return send_file(buffer, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', as_attachment=True, download_name='seguimiento_docentes_salta.xlsx')
+    elif formato == 'pdf':
+        buffer = generar_pdf_listado("Seguimiento de Postulaciones Docentes", headers, filas)
+        return send_file(buffer, mimetype='application/pdf', as_attachment=True, download_name='seguimiento_docentes_salta.pdf')
+    else:
+        abort(404)
 
 # --- COMPROBANTE DE INSCRIPCIÓN (PDF DESCARGABLE) ---
 @app.route('/comprobante/<int:postulante_id>')
