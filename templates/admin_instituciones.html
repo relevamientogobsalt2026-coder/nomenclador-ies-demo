@@ -48,9 +48,14 @@
         </div>
 
         <!-- Listado -->
-        <h2 class="text-lg font-bold text-purple-900 mb-4">Institutos Registrados</h2>
+        <div class="flex flex-col md:flex-row justify-between items-center mb-4 gap-3">
+            <h2 class="text-lg font-bold text-purple-900">Institutos Registrados</h2>
+            <div class="w-full md:w-auto">
+                <input type="text" id="searchInstitutos" onkeyup="filtrarInstitutos()" placeholder="🔍 Filtrar por nombre, localidad o email..." class="border p-2 rounded-lg text-xs w-full md:w-80 shadow-sm focus:ring-2 focus:ring-purple-500">
+            </div>
+        </div>
         <div class="overflow-x-auto">
-            <table class="w-full text-left border-collapse text-xs">
+            <table id="tablaInstitutos" class="w-full text-left border-collapse text-xs">
                 <thead>
                     <tr class="bg-purple-50 text-purple-900 border-b">
                         <th class="p-3">N° IES</th>
@@ -65,13 +70,13 @@
                 </thead>
                 <tbody class="divide-y">
                     {% for i in institutos %}
-                    <tr class="hover:bg-slate-50">
+                    <tr class="hover:bg-slate-50 fila-instituto">
                         <td class="p-2"><input type="text" name="numero_ies" value="{{ i.numero_ies }}" form="form-edit-{{ i.id }}" class="border p-1 rounded w-20"></td>
-                        <td class="p-2"><input type="text" name="nombre" value="{{ i.nombre }}" form="form-edit-{{ i.id }}" class="border p-1 rounded w-48"></td>
-                        <td class="p-2"><input type="text" name="localidad" value="{{ i.localidad }}" form="form-edit-{{ i.id }}" class="border p-1 rounded w-28"></td>
+                        <td class="p-2"><input type="text" name="nombre" value="{{ i.nombre }}" form="form-edit-{{ i.id }}" class="border p-1 rounded w-48 campo-nombre"></td>
+                        <td class="p-2"><input type="text" name="localidad" value="{{ i.localidad }}" form="form-edit-{{ i.id }}" class="border p-1 rounded w-28 campo-localidad"></td>
                         <td class="p-2"><input type="text" name="direccion" value="{{ i.direccion or '' }}" form="form-edit-{{ i.id }}" class="border p-1 rounded w-32"></td>
                         <td class="p-2"><input type="text" name="telefono" value="{{ i.telefono or '' }}" form="form-edit-{{ i.id }}" class="border p-1 rounded w-24"></td>
-                        <td class="p-2"><input type="email" name="email" value="{{ i.email }}" form="form-edit-{{ i.id }}" class="border p-1 rounded w-56 font-semibold"></td>
+                        <td class="p-2"><input type="email" name="email" value="{{ i.email }}" form="form-edit-{{ i.id }}" class="border p-1 rounded w-56 font-semibold campo-email"></td>
                         <td class="p-2">
                             <button type="button" onclick="abrirMapaUbicacion('{{ i.id }}', {{ i.latitud if i.latitud is not none else 'null' }}, {{ i.longitud if i.longitud is not none else 'null' }})" class="bg-teal-600 hover:bg-teal-700 text-white px-2 py-1 rounded whitespace-nowrap">
                                 📍 Ubicar
@@ -95,6 +100,7 @@
                     {% endfor %}
                 </tbody>
             </table>
+            <p id="sinResultadosInstitutos" class="text-slate-400 italic text-sm mt-3 hidden">No se encontraron institutos que coincidan con la búsqueda.</p>
         </div>
     </main>
 
@@ -126,8 +132,6 @@
             document.getElementById('modalMapa').classList.remove('hidden');
             document.getElementById('modalMapa').classList.add('flex');
 
-            // Hay que esperar a que el modal sea visible antes de inicializar Leaflet,
-            // si no el mapa se ve cortado/gris.
             setTimeout(() => {
                 const centroInicial = (latExistente && lonExistente) ? [latExistente, lonExistente] : [-24.78, -64.6];
                 const zoomInicial = (latExistente && lonExistente) ? 15 : 7;
@@ -182,6 +186,32 @@
             document.getElementById('coordsTexto-' + targetActual).textContent =
                 coordsElegidas.lat.toFixed(4) + ', ' + coordsElegidas.lon.toFixed(4);
             cerrarMapaUbicacion();
+        }
+
+        // --- Filtro de búsqueda (sin importar mayúsculas/acentos) ---
+        function normalizarTexto(str) {
+            return (str || '')
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .toLowerCase();
+        }
+
+        function filtrarInstitutos() {
+            const filtro = normalizarTexto(document.getElementById('searchInstitutos').value);
+            const filas = document.querySelectorAll('.fila-instituto');
+            let visibles = 0;
+
+            filas.forEach(fila => {
+                const nombre = normalizarTexto(fila.querySelector('.campo-nombre')?.value);
+                const localidad = normalizarTexto(fila.querySelector('.campo-localidad')?.value);
+                const email = normalizarTexto(fila.querySelector('.campo-email')?.value);
+
+                const coincide = nombre.includes(filtro) || localidad.includes(filtro) || email.includes(filtro);
+                fila.style.display = coincide ? '' : 'none';
+                if (coincide) visibles++;
+            });
+
+            document.getElementById('sinResultadosInstitutos').classList.toggle('hidden', visibles > 0);
         }
     </script>
 </body>

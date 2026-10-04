@@ -24,10 +24,15 @@
             Para agregar una fila nueva, cargá la materia desde <a href="/admin" class="text-indigo-600 underline">Nomenclador de Materias</a>.
         </p>
 
-        <h2 class="text-xl font-bold mb-4 text-indigo-900">Carreras y Resoluciones por Instituto</h2>
+        <div class="flex flex-col md:flex-row justify-between items-center mb-4 gap-3">
+            <h2 class="text-xl font-bold text-indigo-900">Carreras y Resoluciones por Instituto</h2>
+            <div class="w-full md:w-auto">
+                <input type="text" id="searchPlanilla" onkeyup="filtrarPlanilla()" placeholder="🔍 Filtrar por instituto, localidad, carrera o materia..." class="border p-2 rounded-lg text-xs w-full md:w-80 shadow-sm focus:ring-2 focus:ring-indigo-500">
+            </div>
+        </div>
         
         <div class="overflow-x-auto">
-            <table class="w-full text-left border-collapse text-xs">
+            <table id="tablaPlanilla" class="w-full text-left border-collapse text-xs">
                 <thead>
                     <tr class="bg-indigo-50 text-indigo-900 border-b">
                         <th class="p-2">Instituto / Nº</th>
@@ -42,21 +47,21 @@
                 </thead>
                 <tbody class="divide-y">
                     {% for m in materias %}
-                    <tr class="hover:bg-slate-50">
-                        <td class="p-2 font-semibold">
+                    <tr class="hover:bg-slate-50 fila-planilla">
+                        <td class="p-2 font-semibold campo-instituto">
                             {{ m.institutos.nombre if m.institutos else '—' }}<br>
                             <span class="text-slate-500">Nº: {{ m.institutos.numero_ies if m.institutos else '' }}</span>
                         </td>
-                        <td class="p-2">{{ m.institutos.localidad if m.institutos else '' }}</td>
+                        <td class="p-2 campo-localidad">{{ m.institutos.localidad if m.institutos else '' }}</td>
                         <td class="p-2">
-                            <input type="text" name="carrera" value="{{ m.carrera }}" form="form-mat-{{ m.id }}" class="border p-1 rounded w-40">
+                            <input type="text" name="carrera" value="{{ m.carrera }}" form="form-mat-{{ m.id }}" class="border p-1 rounded w-40 campo-carrera">
                         </td>
                         <td class="p-2">
                             <input type="text" name="resolucion" value="{{ m.resolucion }}" form="form-mat-{{ m.id }}" class="border p-1 rounded w-28 font-bold text-indigo-700">
                         </td>
                         <td class="p-2">
-                            <input type="text" name="codigo" value="{{ m.codigo }}" form="form-mat-{{ m.id }}" class="border p-1 rounded w-16">
-                            <input type="text" name="nombre_unidad_curricular" value="{{ m.nombre_unidad_curricular }}" form="form-mat-{{ m.id }}" class="border p-1 rounded w-36 mt-1">
+                            <input type="text" name="codigo" value="{{ m.codigo }}" form="form-mat-{{ m.id }}" class="border p-1 rounded w-16 campo-codigo">
+                            <input type="text" name="nombre_unidad_curricular" value="{{ m.nombre_unidad_curricular }}" form="form-mat-{{ m.id }}" class="border p-1 rounded w-36 mt-1 campo-materia">
                         </td>
                         <td class="p-2">
                             <input type="text" name="regimen" value="{{ m.regimen }}" form="form-mat-{{ m.id }}" class="border p-1 rounded w-20">
@@ -80,7 +85,38 @@
                     {% endfor %}
                 </tbody>
             </table>
+            <p id="sinResultadosPlanilla" class="text-slate-400 italic text-sm mt-3 hidden">No se encontraron resultados que coincidan con la búsqueda.</p>
         </div>
     </main>
+
+    <script>
+        function normalizarTexto(str) {
+            return (str || '')
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .toLowerCase();
+        }
+
+        function filtrarPlanilla() {
+            const filtro = normalizarTexto(document.getElementById('searchPlanilla').value);
+            const filas = document.querySelectorAll('.fila-planilla');
+            let visibles = 0;
+
+            filas.forEach(fila => {
+                const instituto = normalizarTexto(fila.querySelector('.campo-instituto')?.textContent);
+                const localidad = normalizarTexto(fila.querySelector('.campo-localidad')?.textContent);
+                const carrera = normalizarTexto(fila.querySelector('.campo-carrera')?.value);
+                const codigo = normalizarTexto(fila.querySelector('.campo-codigo')?.value);
+                const materia = normalizarTexto(fila.querySelector('.campo-materia')?.value);
+
+                const coincide = instituto.includes(filtro) || localidad.includes(filtro) ||
+                                  carrera.includes(filtro) || codigo.includes(filtro) || materia.includes(filtro);
+                fila.style.display = coincide ? '' : 'none';
+                if (coincide) visibles++;
+            });
+
+            document.getElementById('sinResultadosPlanilla').classList.toggle('hidden', visibles > 0 || filas.length === 0);
+        }
+    </script>
 </body>
 </html>
