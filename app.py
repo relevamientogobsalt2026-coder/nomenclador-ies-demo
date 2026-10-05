@@ -685,15 +685,25 @@ def admin_formulario():
     if not supabase:
         return "Supabase no configurado."
     campos = supabase.table('campos_formulario').select('*').order('orden').execute().data
+
+    # Los campos "core" (imprescindibles para que el sistema pueda evaluar al
+    # docente y contactarlo) solo se pueden marcar Obligatorio/Opcional, no
+    # ocultar. El resto de los campos fijos (Localidades, Domicilio, Título 2,
+    # archivos adjuntos) y todos los campos personalizados sí se pueden
+    # deshabilitar del todo desde este panel.
+    CAMPOS_CORE = {'nombre_apellido', 'dni', 'telefono', 'email', 'titulo_base_1', 'anio_egreso_1'}
+    for c in campos:
+        c['permite_ocultar'] = c.get('es_personalizado', False) or c.get('clave') not in CAMPOS_CORE
+
     return render_template('admin_formulario.html', campos=campos)
 
 @app.route('/admin/formulario/actualizar/<int:id>', methods=['POST'])
 def actualizar_campo_formulario(id):
     try:
         data = {"obligatorio": request.form.get('obligatorio') == 'on'}
-        # El "habilitado" solo se edita para los campos personalizados (los fijos
-        # siempre están visibles); la plantilla manda esta bandera para saber si
-        # tiene que tocar esa columna o dejarla como está.
+        # El "habilitado" solo se edita para los campos que lo permiten (la
+        # plantilla manda esta bandera para saber si tiene que tocar esa
+        # columna o dejarla como está).
         if request.form.get('tiene_habilitado') == '1':
             data["habilitado"] = request.form.get('habilitado') == 'on'
         supabase.table('campos_formulario').update(data).eq('id', id).execute()
@@ -745,7 +755,7 @@ def borrar_campo_formulario(id):
     try:
         campo = supabase.table('campos_formulario').select('*').eq('id', id).execute().data
         if campo and not campo[0].get('es_personalizado'):
-            return "No se pueden borrar los campos fijos del sistema, solo deshabilitarlos no aplica a estos.", 400
+            return "No se pueden borrar los campos fijos del sistema.", 400
         supabase.table('campos_formulario').delete().eq('id', id).execute()
         return redirect(url_for('admin_formulario'))
     except Exception as e:

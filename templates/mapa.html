@@ -24,6 +24,12 @@
             <p class="text-sm text-slate-600 mb-4">
                 Ubicación de los institutos registrados en el sistema. Hacé clic en un marcador para ver los datos de contacto.
             </p>
+
+            <div class="mb-4">
+                <input type="text" id="searchMapa" oninput="filtrarMapa()" placeholder="🔍 Buscar instituto por nombre o localidad..." class="border p-2 rounded-lg text-sm w-full md:w-96 shadow-sm focus:ring-2 focus:ring-indigo-500">
+                <p id="sinResultadosMapa" class="text-slate-400 italic text-sm mt-2 hidden">No se encontraron institutos que coincidan con la búsqueda.</p>
+            </div>
+
             <div id="mapa"></div>
             {% if not institutos %}
             <p class="text-slate-400 italic text-sm mt-4">Todavía no hay institutos con ubicación cargada.</p>
@@ -41,11 +47,13 @@
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
         }).addTo(mapa);
 
+        const capaMarcadores = L.layerGroup().addTo(mapa);
+        const listaMarcadores = [];
         const bounds = [];
 
         institutos.forEach(inst => {
             if (inst.latitud && inst.longitud) {
-                const marker = L.marker([inst.latitud, inst.longitud]).addTo(mapa);
+                const marker = L.marker([inst.latitud, inst.longitud]);
                 marker.bindPopup(`
                     <strong>${inst.nombre}</strong><br>
                     📍 ${inst.localidad || ''}<br>
@@ -53,12 +61,44 @@
                     ${inst.email ? '✉️ ' + inst.email + '<br>' : ''}
                     ${inst.telefono ? '📞 ' + inst.telefono : ''}
                 `);
+                capaMarcadores.addLayer(marker);
+                listaMarcadores.push({ marker: marker, nombre: inst.nombre || '', localidad: inst.localidad || '' });
                 bounds.push([inst.latitud, inst.longitud]);
             }
         });
 
         if (bounds.length > 0) {
             mapa.fitBounds(bounds, { padding: [30, 30] });
+        }
+
+        function normalizarTexto(str) {
+            return (str || '')
+                .normalize('NFD')
+                .replace(/[̀-ͯ]/g, '')
+                .toLowerCase();
+        }
+
+        function filtrarMapa() {
+            const filtro = normalizarTexto(document.getElementById('searchMapa').value);
+            capaMarcadores.clearLayers();
+
+            const boundsFiltrados = [];
+            let visibles = 0;
+
+            listaMarcadores.forEach(item => {
+                const coincide = normalizarTexto(item.nombre).includes(filtro) || normalizarTexto(item.localidad).includes(filtro);
+                if (coincide) {
+                    capaMarcadores.addLayer(item.marker);
+                    boundsFiltrados.push(item.marker.getLatLng());
+                    visibles++;
+                }
+            });
+
+            document.getElementById('sinResultadosMapa').classList.toggle('hidden', visibles > 0);
+
+            if (boundsFiltrados.length > 0) {
+                mapa.fitBounds(boundsFiltrados, { padding: [30, 30] });
+            }
         }
     </script>
 </body>

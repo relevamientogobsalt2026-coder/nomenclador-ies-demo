@@ -59,10 +59,13 @@
                         <label class="block text-xs font-semibold mb-1">Correo Electrónico{% if c_email.get('obligatorio', True) %} <span class="text-red-500">*</span>{% endif %}</label>
                         <input type="email" name="email" {% if c_email.get('obligatorio', True) %}required{% endif %} class="w-full border p-2 rounded text-sm">
                     </div>
+                    {% if c_domicilio.get('habilitado', True) %}
                     <div class="md:col-span-2">
                         <label class="block text-xs font-semibold mb-1">Domicilio{% if c_domicilio.get('obligatorio', False) %} <span class="text-red-500">*</span>{% endif %}</label>
                         <input type="text" name="domicilio" placeholder="Calle, número, barrio, localidad" {% if c_domicilio.get('obligatorio', False) %}required{% endif %} class="w-full border p-2 rounded text-sm">
                     </div>
+                    {% endif %}
+                    {% if c_localidades.get('habilitado', True) %}
                     <div class="md:col-span-2">
                         <div class="flex items-center justify-between mb-1">
                             <label class="block text-xs font-semibold">
@@ -100,6 +103,7 @@
                         <p class="text-xs text-slate-400 italic mt-1">La selección de localidades es opcional — puede continuar sin marcar ninguna.</p>
                         {% endif %}
                     </div>
+                    {% endif %}
                 </div>
             </div>
 
@@ -115,14 +119,18 @@
                         <label class="block text-xs font-semibold mb-1">Año de Egreso N° 1{% if c_anio1.get('obligatorio', True) %} <span class="text-red-500">*</span>{% endif %}</label>
                         <input type="number" name="anio_egreso_1" {% if c_anio1.get('obligatorio', True) %}required{% endif %} class="w-full border p-2 rounded text-sm">
                     </div>
+                    {% if c_titulo2.get('habilitado', True) %}
                     <div>
                         <label class="block text-xs font-semibold mb-1">Título Base N° 2{% if c_titulo2.get('obligatorio', False) %} <span class="text-red-500">*</span>{% else %} (Opcional){% endif %}</label>
                         <input type="text" name="titulo_base_2" placeholder="Ej: Ingeniero en Sistemas" {% if c_titulo2.get('obligatorio', False) %}required{% endif %} class="w-full border p-2 rounded text-sm">
                     </div>
+                    {% endif %}
+                    {% if c_anio2.get('habilitado', True) %}
                     <div>
                         <label class="block text-xs font-semibold mb-1">Año de Egreso N° 2{% if c_anio2.get('obligatorio', False) %} <span class="text-red-500">*</span>{% endif %}</label>
                         <input type="number" name="anio_egreso_2" {% if c_anio2.get('obligatorio', False) %}required{% endif %} class="w-full border p-2 rounded text-sm">
                     </div>
+                    {% endif %}
                 </div>
             </div>
 
@@ -130,26 +138,36 @@
             <div class="border-b pb-4">
                 <h3 class="text-lg font-semibold text-indigo-900 mb-3">3. Documentación Digital (PDF / Imágenes)</h3>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                    {% if c_dni_a.get('habilitado', True) %}
                     <div>
                         <label class="block font-semibold mb-1">DNI (Frente / Lado A){% if c_dni_a.get('obligatorio', False) %} <span class="text-red-500">*</span>{% endif %}</label>
                         <input type="file" name="dni_a" accept="image/*,application/pdf" {% if c_dni_a.get('obligatorio', False) %}required{% endif %} class="w-full border p-1 rounded">
                     </div>
+                    {% endif %}
+                    {% if c_dni_b.get('habilitado', True) %}
                     <div>
                         <label class="block font-semibold mb-1">DNI (Dorso / Lado B){% if c_dni_b.get('obligatorio', False) %} <span class="text-red-500">*</span>{% endif %}</label>
                         <input type="file" name="dni_b" accept="image/*,application/pdf" {% if c_dni_b.get('obligatorio', False) %}required{% endif %} class="w-full border p-1 rounded">
                     </div>
+                    {% endif %}
+                    {% if c_titulo_a.get('habilitado', True) %}
                     <div>
                         <label class="block font-semibold mb-1">Título Base (Frente / Lado A){% if c_titulo_a.get('obligatorio', False) %} <span class="text-red-500">*</span>{% endif %}</label>
                         <input type="file" name="titulo_a" accept="image/*,application/pdf" {% if c_titulo_a.get('obligatorio', False) %}required{% endif %} class="w-full border p-1 rounded">
                     </div>
+                    {% endif %}
+                    {% if c_titulo_b.get('habilitado', True) %}
                     <div>
                         <label class="block font-semibold mb-1">Título Base (Dorso / Lado B){% if c_titulo_b.get('obligatorio', False) %} <span class="text-red-500">*</span>{% endif %}</label>
                         <input type="file" name="titulo_b" accept="image/*,application/pdf" {% if c_titulo_b.get('obligatorio', False) %}required{% endif %} class="w-full border p-1 rounded">
                     </div>
+                    {% endif %}
+                    {% if c_cv.get('habilitado', True) %}
                     <div class="md:col-span-2">
                         <label class="block font-semibold mb-1">CV Nominal (PDF){% if c_cv.get('obligatorio', False) %} <span class="text-red-500">*</span>{% endif %}</label>
                         <input type="file" name="cv_pdf" accept="application/pdf" {% if c_cv.get('obligatorio', False) %}required{% endif %} class="w-full border p-1 rounded">
                     </div>
+                    {% endif %}
                 </div>
             </div>
 
@@ -201,11 +219,12 @@
             });
         });
 
-        // La obligatoriedad de Localidades la define el admin desde el panel
-        // (Administración > Configurar Formulario), no se elige desde acá.
+        // La obligatoriedad y la visibilidad de Localidades las define el admin
+        // desde el panel (Administración > Configurar Formulario).
+        const localidadesHabilitado = {{ 'true' if c_localidades.get('habilitado', True) else 'false' }};
         const localidadesObligatorio = {{ 'true' if c_localidades.get('obligatorio', True) else 'false' }};
         document.querySelector('form').addEventListener('submit', function(e) {
-            if (localidadesObligatorio) {
+            if (localidadesHabilitado && localidadesObligatorio) {
                 const seleccionadas = document.querySelectorAll('.localidad-checkbox:checked').length;
                 if (seleccionadas === 0) {
                     e.preventDefault();

@@ -22,7 +22,7 @@
     <main class="max-w-6xl mx-auto my-6 p-6 bg-white rounded-xl shadow border">
         <p class="text-xs text-slate-500 mb-4">
             Acá controlás qué datos pide el formulario público (<a href="/" class="text-sky-600 underline">el que completan los docentes</a>),
-            sin tocar código. Marcá cada campo como obligatorio u opcional, y agregá campos nuevos si hace falta pedir algo más.
+            sin tocar código. Marcá cada campo como obligatorio u opcional, deshabilitá los que no quieras pedir, y agregá campos nuevos si hace falta pedir algo más.
         </p>
 
         <h2 class="text-lg font-bold text-sky-900 mb-3">Campos del Formulario</h2>
@@ -49,7 +49,7 @@
                         </td>
                         <td class="p-2">
                             <form id="form-campo-{{ campo.id }}" action="/admin/formulario/actualizar/{{ campo.id }}" method="POST" class="flex items-center gap-2">
-                                <input type="hidden" name="tiene_habilitado" value="{{ '1' if campo.es_personalizado else '0' }}">
+                                <input type="hidden" name="tiene_habilitado" value="{{ '1' if campo.permite_ocultar else '0' }}">
                                 <label class="inline-flex items-center gap-1 cursor-pointer select-none">
                                     <input type="checkbox" name="obligatorio" {% if campo.obligatorio %}checked{% endif %} class="h-4 w-4 text-sky-600 rounded">
                                     <span>{{ 'Obligatorio' if campo.obligatorio else 'Opcional' }}</span>
@@ -57,8 +57,8 @@
                             </form>
                         </td>
                         <td class="p-2">
-                            {% if campo.es_personalizado %}
-                            <label class="inline-flex items-center gap-1 cursor-pointer select-none" form="form-campo-{{ campo.id }}">
+                            {% if campo.permite_ocultar %}
+                            <label class="inline-flex items-center gap-1 cursor-pointer select-none">
                                 <input type="checkbox" name="habilitado" form="form-campo-{{ campo.id }}" {% if campo.habilitado %}checked{% endif %} class="h-4 w-4 text-sky-600 rounded">
                                 <span>{{ 'Habilitado' if campo.habilitado else 'Deshabilitado' }}</span>
                             </label>
