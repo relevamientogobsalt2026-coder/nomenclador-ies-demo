@@ -54,7 +54,9 @@ def subir_archivo(file_storage, subcarpeta):
         print(f"Error al subir archivo a Storage: {e}")
         return None
 
-LOGO_PATH = os.path.join(os.path.dirname(__file__), 'static', 'logo_salta.png')
+# El logo está guardado en templates/static/logo_salta.png (no en static/ en la raíz),
+# así que la ruta apunta ahí para que el PDF lo encuentre.
+LOGO_PATH = os.path.join(os.path.dirname(__file__), 'templates', 'static', 'logo_salta.png')
 
 def generar_comprobante_pdf(docente, materias_habilitadas):
     """Genera el PDF de comprobante de inscripción del postulante, con el logo del
@@ -181,8 +183,8 @@ def generar_comprobante_pdf(docente, materias_habilitadas):
     return buffer
 
 def armar_mailto(docente, materias_habilitadas, instituto_id=None):
-    """Arma un link mailto: con asunto y cuerpo pre-cargados con los datos del postulante
-    y las materias habilitadas, dirigido al email del instituto correspondiente.
+    """Arma un link de redacción de Gmail con asunto y cuerpo pre-cargados con los datos
+    del postulante y las materias habilitadas, dirigido al email del instituto correspondiente.
 
     Si se pasa instituto_id, filtra las materias para armar el correo solo con
     las que correspondan a ESE instituto puntual (para cuando el docente tiene
@@ -218,9 +220,13 @@ def armar_mailto(docente, materias_habilitadas, instituto_id=None):
 
     cuerpo = "\n".join(lineas)
 
+    # Usamos el link de redacción web de Gmail (en vez de "mailto:") para que el botón
+    # abra directamente Gmail en una pestaña nueva con todo precargado, sin pedir que
+    # el navegador elija una aplicación de escritorio.
     return (
-        f"mailto:{email_destino}"
-        f"?subject={urllib.parse.quote(asunto)}"
+        f"https://mail.google.com/mail/?view=cm&fs=1"
+        f"&to={urllib.parse.quote(email_destino)}"
+        f"&su={urllib.parse.quote(asunto)}"
         f"&body={urllib.parse.quote(cuerpo)}"
     )
 
